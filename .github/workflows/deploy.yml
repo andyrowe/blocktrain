@@ -1,0 +1,27 @@
+name: Deploy site to Cloudflare Pages
+
+# Auto-deploys the static site whenever site/ changes on master. The Cloudflare API
+# token lives as a repo secret (set by the owner), so no credential is stored anywhere
+# else. Manual runs available via the "Run workflow" button (workflow_dispatch).
+on:
+  push:
+    branches: [master]
+    paths:
+      - "site/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # If your Pages project has a different name, change --project-name below.
+          command: pages deploy site --project-name=blocktrain --branch=main --commit-dirty=true
