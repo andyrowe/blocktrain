@@ -68,5 +68,12 @@ blindness.
 
 ## Status
 
-Alpha. Pure core + CLI + offline verification proven. First real mainnet anchor pending.
-Reference implementation for on-chain anchoring: `anchorchain` (prof-faustus, MIT).
+Alpha. Pure core + CLI + offline verification proven; first mainnet batch anchored and
+independently verified. Reference implementation for on-chain anchoring: `anchorchain`
+(prof-faustus, MIT).
+
+## License
+
+Apache-2.0 — see [LICENSE](./LICENSE) and [NOTICE](./NOTICE). Chosen over MIT for the explicit
+contributor patent grant and retaliation clause, which suit a project used for audit and
+dispute in a patent-sensitive area (Merkle/SPV/anchoring).

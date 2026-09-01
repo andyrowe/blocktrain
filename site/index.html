@@ -51,6 +51,8 @@ curl -O https://blocktrain.org/blocktrain-poc.json
 node verify.mjs blocktrain-poc.json</pre>
   <p class="kv">It never contacts blocktrain or bsv.cx — only WhatsOnChain and your own CPU.
   Output ends with <span class="ok">✅ VERIFIED — batch existed, in order, anchored on-chain.</span></p>
+  <p class="kv">Rather read before you run? The verifier is ~130 lines of dependency-free JavaScript —
+  <a href="https://github.com/andyrowe/blocktrain/blob/master/site/verify.mjs">read it on GitHub</a>.</p>
 
   <h2>This PoC, on mainnet</h2>
   <div class="panel kv">
@@ -80,14 +82,15 @@ node verify.mjs blocktrain-poc.json</pre>
   </div>
 
   <h2>Privacy</h2>
-  <p>The blockchain only ever holds a hash — never your data. Contents live off-chain, encrypted, with
-  blind anchoring the default: blocktrain can hold your proofs without being able to read them. Access
-  can be shared with specific parties (a client, their counsel, a counterparty) without ever putting
-  plaintext on-chain.</p>
+  <p><b>Shipped:</b> the blockchain only ever holds a hash — never your data.</p>
+  <p><b>On the roadmap:</b> off-chain contents encrypted at rest, with <em>blind anchoring</em> the
+  default — blocktrain holds your proofs without being able to read them — and selective sharing with
+  specific parties (a client, their counsel, a counterparty) without ever putting plaintext on-chain.
+  Not built yet; described here so you know where this is going.</p>
 
   <footer>
-    Alpha · MIT · built on <a href="https://bsv.cx">bsv.cx</a>. blocktrain proves what agents do so
-    they can be trusted with more.
+    Alpha · Apache-2.0 · <a href="https://github.com/andyrowe/blocktrain">source</a> · built on
+    <a href="https://bsv.cx">bsv.cx</a>. blocktrain proves what agents do so they can be trusted with more.
   </footer>
 </div>
 </body>
