@@ -14,5 +14,8 @@
     "node": ">=24"
   },
   "license": "MIT",
-  "private": true
+  "private": true,
+  "dependencies": {
+    "@bsv/sdk": "^2.4.2"
+  }
 }

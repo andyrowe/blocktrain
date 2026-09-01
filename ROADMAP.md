@@ -14,12 +14,16 @@ Hash-chain, client-side RFC 6962 verifier, append-only store, bsv.cx client, CLI
 **Proof:** 12/12 tests (CT vectors + tamper/reorder/splice/delete detection); full offline
 dry-run (append → seal --dry → verify) and a flipped byte trips `CHAIN BROKEN`.
 
-## Phase 1 — First real mainnet anchor 💸  ← next, needs your go
-Prove the money path end-to-end. Seal a real batch of a few of Mike's events via bsv.cx
-`/n/batch`; the root-match gate must pass (local Merkle root == bsv.cx's or it aborts).
-**Deliverable:** real `blocktrain seal`; txid recorded; `verify --spv` green; a from-scratch
-re-verify that fetches the bsv.cx proof, folds it locally, and decodes the OP_RETURN to
-`bsv.cx/not2/<root>`. **Proof:** a real txid anyone can independently decode + verify.
+## Phase 1 — First real mainnet anchor 💸 ✅ DONE (2026-08-31)
+Proved the money path end-to-end. blocktrain became a real **x402 client** (`src/pay.ts`):
+`seal` pays the pay-gated `/n/batch` invoice (300 sats) with a signed BSV tx and resubmits
+with `PAYMENT-SIGNATURE`. Root-match gate passed (local Merkle root == bsv.cx's).
+- **Anchor tx:** `48959852d314fe8a47f4ba9816801563260cdbf0b5edde0ebf4f5534113cac58`
+- **Merkle root:** `35eada666d0bc883f286816dbd5e772dca208e0cb0e3dd6501ede5d589f589b1`
+- **x402 settlement tx:** `a5b72e649dd25f2ab209dfa59ddd6d77c29e9f07f3651c59a54da016d91cfdfa`
+- **Proof:** `scripts/independent-verify.ts` — folds bsv.cx's proof with our own verifier
+  AND decodes the on-chain OP_RETURN (`["bsv.cx","not2","35eada66…"]`) from WhatsOnChain:
+  **✅ independently verified**, trusting only the chain. `verify --spv` also green.
 
 ## Phase 2 — Mechanical capture (fidelity: mechanical)
 Stop hand-typing events. An OpenClaw hook appends an entry on every **outward/mutating**

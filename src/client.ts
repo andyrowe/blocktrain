@@ -44,17 +44,56 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
   }
 }
 
-// Anchor an ordered set of linkHashes as one on-chain not2 batch. SPENDS FLOAT.
-export function anchorBatch(hashes: string[], base = DEFAULT_BASE): Promise<BatchReceipt> {
-  return jsonFetch<BatchReceipt>(`${base}/n/batch`, {
-    method: "POST",
-    body: JSON.stringify({ hashes }),
-  });
+// Anchor an ordered set of linkHashes as one on-chain not2 batch.
+// bsv.cx's /n/batch is x402 pay-gated, so a funded WIF is required to pay the invoice.
+// Returns the batch receipt plus the settlement txid of the x402 payment we made.
+export async function anchorBatch(
+  hashes: string[],
+  wif: string,
+  base = DEFAULT_BASE,
+): Promise<BatchReceipt & { settlementTxid: string }> {
+  const { data, settlementTxid } = await postPaid<BatchReceipt>(`${base}/n/batch`, { hashes }, wif);
+  return { ...data, settlementTxid };
 }
 
 // Pull bsv.cx's own inclusion proof for a hash. Free. We still verify it locally.
 export function fetchProof(hash: string, base = DEFAULT_BASE): Promise<BsvcxProof> {
   return jsonFetch<BsvcxProof>(`${base}/n/${hash}/proof`);
+}
+
+import { postPaid } from "./pay.ts";
+
+// Ground-truth on-chain check: read the anchor tx from the public chain (WhatsOnChain)
+// and confirm its OP_RETURN encodes `bsv.cx/not2/<root>`. This trusts only the chain and
+// math — not bsv.cx. Returns true iff the committed root is on-chain in that tx.
+export async function anchorCarriesRoot(
+  txid: string,
+  root: string,
+  net: "main" | "test" = "main",
+): Promise<boolean> {
+  const { Transaction } = await import("@bsv/sdk");
+  const hex = (await (await fetch(`https://api.whatsonchain.com/v1/bsv/${net}/tx/${txid}/hex`)).text()).trim();
+  if (!/^[0-9a-f]+$/i.test(hex)) return false;
+  const tx = Transaction.fromHex(hex);
+  for (const o of tx.outputs) {
+    const script = Buffer.from(o.lockingScript.toHex(), "hex");
+    let p = 0;
+    if (script[p] === 0x00) p++;
+    if (script[p] !== 0x6a) continue;
+    p++;
+    const chunks: string[] = [];
+    while (p < script.length) {
+      const len = script[p];
+      if (len >= 0x4c) break;
+      p++;
+      chunks.push(script.subarray(p, p + len).toString("utf8"));
+      p += len;
+    }
+    if (chunks[0] === "bsv.cx" && chunks[1] === "not2" && chunks[2]?.toLowerCase() === root.toLowerCase()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export type SpvResult = { status: "confirmed" | "rejected" | "inconclusive"; [k: string]: unknown };

@@ -9,6 +9,7 @@ import type { LogEntry } from "./chain.ts";
 export type Seal = {
   root: string; // merkle root of the sealed linkHashes (== bsv.cx not2 root)
   txid: string; // on-chain anchor txid
+  settlementTxid?: string; // x402 payment tx we sent to bsv.cx (provenance of the spend)
   network: string; // "main" | "test"
   anchored: boolean;
   createdAt: string;

@@ -13,7 +13,7 @@ import { Buffer } from "node:buffer";
 import { appendEntry, verifyChain } from "../src/chain.ts";
 import { readLog, appendLog, readSeals, writeSeals, sealedThrough, type Seal } from "../src/store.ts";
 import { merkleRoot, proofForIndex, verifyInclusion } from "../src/merkle.ts";
-import { anchorBatch, spvVerify } from "../src/client.ts";
+import { anchorBatch, anchorCarriesRoot } from "../src/client.ts";
 
 const LOG = process.env.BLOCKTRAIN_LOG ?? "data/log.jsonl";
 const SEALS = process.env.BLOCKTRAIN_SEALS ?? "data/seals.json";
@@ -72,8 +72,11 @@ async function main() {
         console.log(`[dry] would anchor ${leaves.length} entries (seq ${from}..${log.length - 1})`);
         console.log(`[dry] local merkle root ${localRoot}`);
       } else {
-        console.log(`anchoring ${leaves.length} entries (seq ${from}..${log.length - 1}) via bsv.cx ...`);
-        const receipt = await anchorBatch(leaves);
+        const wif = process.env.BLOCKTRAIN_PAY_WIF;
+        if (!wif) throw new Error("seal: set BLOCKTRAIN_PAY_WIF to a funded mainnet WIF (bsv.cx /n/batch is x402 pay-gated)");
+        console.log(`anchoring ${leaves.length} entries (seq ${from}..${log.length - 1}) via bsv.cx (x402) ...`);
+        const receipt = await anchorBatch(leaves, wif);
+        if (receipt.settlementTxid) console.log(`paid x402 invoice, settlement tx ${receipt.settlementTxid}`);
         // Compat gate: bsv.cx MUST derive the same root from the same leaves, or our
         // client-side verifier and their tree disagree — refuse to record a bad seal.
         if (receipt.root.toLowerCase() !== localRoot.toLowerCase()) {
@@ -83,6 +86,7 @@ async function main() {
         }
         seal = {
           root: receipt.root, txid: receipt.txid, network: "main", anchored: receipt.anchored,
+          settlementTxid: receipt.settlementTxid,
           createdAt: new Date().toISOString(), fromSeq: from, toSeq: log.length - 1, leaves,
         };
         console.log(`anchored txid ${receipt.txid} root ${receipt.root} (roots match ✓)`);
@@ -122,14 +126,16 @@ async function main() {
             process.exit(1);
           }
         }
-        // 3) optional: confirm the root is in a real block per bsv.cx headers
+        // 3) optional: read the anchor tx off the public chain and confirm its OP_RETURN
+        //    encodes bsv.cx/not2/<root> — ground truth, trusting only the chain.
         let spvNote = s.anchored ? "anchored" : "(unanchored)";
         if (withSpv && s.txid && s.txid !== "DRY") {
           try {
-            const r = await spvVerify({ txid: s.txid, index: 0, nodes: [], root: s.root });
-            spvNote = `spv:${r.status}`;
+            const onchain = await anchorCarriesRoot(s.txid, s.root, s.network === "test" ? "test" : "main");
+            spvNote = onchain ? "on-chain:root-confirmed ✓" : "on-chain:ROOT-NOT-FOUND ✗";
+            if (!onchain) process.exit(1);
           } catch (e) {
-            spvNote = `spv:error(${(e as Error).message.slice(0, 60)})`;
+            spvNote = `on-chain:error(${(e as Error).message.slice(0, 50)})`;
           }
         }
         console.log(`seal seq ${s.fromSeq}..${s.toSeq} root ${s.root.slice(0, 16)}… txid ${s.txid.slice(0, 12)}… ${spvNote}`);
