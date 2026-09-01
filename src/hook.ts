@@ -31,8 +31,10 @@ type Classified = { kind: string; data: Record<string, unknown> } | null;
 
 // Bash is used for everything; only capture clearly outward/mutating commands.
 const BASH_RULES: Array<[RegExp, string]> = [
-  [/\bgit\s+push\b/, "git.push"],
-  [/\bgit\s+(-c[^ ]*\s+)*commit\b/, "git.commit"],
+  // permissive about flags (e.g. `git -c user.email=x commit`) but bounded by command
+  // separators so a later chained command can't leak into the classification
+  [/\bgit\b[^;|&]*\bpush\b/, "git.push"],
+  [/\bgit\b[^;|&]*\bcommit\b/, "git.commit"],
   [/\bscp\b/, "deploy.scp"],
   [/\brsync\b/, "deploy.rsync"],
   [/\brclone\s+(copy|copyto|sync|move|delete|purge)\b/, "deploy.rclone"],
@@ -94,11 +96,14 @@ export function classify(ev: ToolEvent): Classified {
     return { kind: tool === "NotebookEdit" ? "notebook.edit" : `file.${tool === "Write" ? "write" : "edit"}`, data: { path: path || undefined } };
   }
 
-  // Shell — only the mutating/outward subset
+  // Shell — only the mutating/outward subset. Match against the command with quoted
+  // regions stripped, so trigger words inside args/messages (e.g. a commit message that
+  // mentions "git push") can't misclassify the action.
   if (tool === "Bash") {
     const cmd = str(input.command);
+    const scan = cmd.replace(/'[^']*'/g, "''").replace(/"[^"]*"/g, '""');
     for (const [re, cat] of BASH_RULES) {
-      if (re.test(cmd)) return { kind: `shell.${cat}`, data: { cmdLen: cmd.length } };
+      if (re.test(scan)) return { kind: `shell.${cat}`, data: { cmdLen: cmd.length } };
     }
     return null; // reads, greps, ls, tests, etc.
   }
