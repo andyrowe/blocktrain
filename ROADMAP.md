@@ -25,12 +25,19 @@ with `PAYMENT-SIGNATURE`. Root-match gate passed (local Merkle root == bsv.cx's)
   AND decodes the on-chain OP_RETURN (`["bsv.cx","not2","35eada66…"]`) from WhatsOnChain:
   **✅ independently verified**, trusting only the chain. `verify --spv` also green.
 
-## Phase 2 — Mechanical capture (fidelity: mechanical)
-Stop hand-typing events. An OpenClaw hook appends an entry on every **outward/mutating**
-action I take (send, spend, post, deploy, write) — not reads (noise + privacy). Agent
-can't skip it. **Deliverable:** settings.json hook → `blocktrain append` with tool-call
-metadata. **Proof:** I perform real actions; they appear in the log without my choosing to
-log them; verify stays green. *(This is what makes it a real agent log, not a demo script.)*
+## Phase 2 — Mechanical capture (fidelity: mechanical) ✅ BUILT (2026-08-31)
+Stop hand-typing events. A Claude Code **PostToolUse hook** (`~/.claude/settings.json`)
+runs `blocktrain hook` on every tool call; `src/hook.ts` classifies and appends an entry
+for **outward/mutating** actions only (message send, file write/edit, git push/commit,
+scp/rsync/rclone, systemctl, http writes, npm publish, gh create, cron, agent send/spawn,
+media gen) — reads (Read/Grep/Glob/web/memory/search) are ignored.
+- **Privacy by construction:** never stores raw content — only coarse descriptors (tool,
+  action, coarse target, byte length) + `payloadHash = sha256(nonce ‖ tool_input)`.
+  Verified: message text and shell commands do NOT appear in the log.
+- **Safe:** best-effort, never throws/blocks the agent; file lock keeps the hash-chain
+  intact under parallel tool calls (proven: 20 concurrent appends, chain ok, no residue).
+- **Proof:** synthetic events classify correctly (captures outward, skips reads); live
+  capture begins once the session reloads settings.
 
 ## Phase 3 — Minimal public verify  ← **"WORKING PoC" reached here (P1+P2+P3)**
 Someone other than us can check it. Publish the public/asserted slice of Mike's anchored

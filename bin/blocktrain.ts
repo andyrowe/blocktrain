@@ -10,6 +10,7 @@
 // BLOCKTRAIN_SEALS (default ./data/seals.json), BLOCKTRAIN_BSVCX (default https://bsv.cx).
 
 import { Buffer } from "node:buffer";
+import { readFileSync } from "node:fs";
 import { appendEntry, verifyChain } from "../src/chain.ts";
 import { readLog, appendLog, readSeals, writeSeals, sealedThrough, type Seal } from "../src/store.ts";
 import { merkleRoot, proofForIndex, verifyInclusion } from "../src/merkle.ts";
@@ -145,6 +146,23 @@ async function main() {
       const unsealed = log.length - 1 - sealed;
       console.log(`verified ${anchorsOk} seals; ${unsealed > 0 ? unsealed + " entries pending seal" : "all entries sealed"}`);
       break;
+    }
+
+    case "hook": {
+      // Read a harness PostToolUse event from stdin and append a redacted entry if it's
+      // an outward/mutating action. Best-effort, never fails the caller.
+      const { runHook } = await import("../src/hook.ts");
+      let stdinStr = "";
+      try {
+        stdinStr = readFileSync(0, "utf8");
+      } catch {
+        process.exit(0); // no stdin -> nothing to do
+      }
+      const entry = runHook(stdinStr, LOG);
+      if (entry && process.env.BLOCKTRAIN_HOOK_DEBUG) {
+        console.error(`[blocktrain hook] captured seq=${entry.seq} ${entry.kind}`);
+      }
+      process.exit(0); // always succeed
     }
 
     case "status": {
