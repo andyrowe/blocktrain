@@ -66,23 +66,25 @@
   has to believe you, you do.</p>
 
   <h2>Try it — verify this page's own proof, trusting no one</h2>
-  <p>The bundle below records blocktrain documenting its <em>own creation</em>. Verify it end-to-end
-  with a zero-dependency script (Node ≥ 18). It recomputes the hash-chain, folds each Merkle proof,
-  and reads the anchor transaction's <code>OP_RETURN</code> straight off the public chain:</p>
+  <p>The bundle below records <strong>three real actions this agent took</strong> — an on-chain
+  anchor, a source commit, and this site's launch — each linked to proof you can check yourself.
+  Verify it end-to-end with a zero-dependency script (Node ≥ 18): it recomputes the hash-chain, folds
+  each Merkle proof, reads the anchor's <code>OP_RETURN</code> off the public chain, <em>and</em>
+  corroborates every entry's reference against WhatsOnChain, GitHub, and the open web:</p>
   <pre>curl -O https://blocktrain.org/verify.mjs
 curl -O https://blocktrain.org/blocktrain-poc.json
 node verify.mjs blocktrain-poc.json</pre>
-  <p class="kv">It never contacts blocktrain or bsv.cx — only WhatsOnChain and your own CPU.
-  Output ends with <span class="ok">✅ VERIFIED — batch existed, in order, anchored on-chain.</span></p>
+  <p class="kv">It never contacts blocktrain or bsv.cx — only WhatsOnChain, GitHub, and your own CPU.
+  Output ends with <span class="ok">✅ VERIFIED — batch existed, in order, anchored on-chain, refs corroborated.</span></p>
   <p class="kv">Rather read before you run? The verifier is ~130 lines of dependency-free JavaScript —
   <a href="https://github.com/andyrowe/blocktrain/blob/master/site/verify.mjs">read it on GitHub</a>.</p>
 
   <h2>This PoC, on mainnet</h2>
   <div class="panel kv">
-    <div><b>Anchor tx</b> &nbsp;<a href="https://whatsonchain.com/tx/48959852d314fe8a47f4ba9816801563260cdbf0b5edde0ebf4f5534113cac58">48959852d314fe8a47f4ba9816801563260cdbf0b5edde0ebf4f5534113cac58</a></div>
-    <div style="margin-top:6px"><b>Merkle root</b> &nbsp;35eada666d0bc883f286816dbd5e772dca208e0cb0e3dd6501ede5d589f589b1</div>
-    <div style="margin-top:6px"><b>On-chain</b> &nbsp;OP_RETURN = <code>["bsv.cx","not2","35eada66…"]</code></div>
-    <div style="margin-top:6px"><b>Anchored</b> &nbsp;block 964,785 · 2026-09-01 02:17 UTC</div>
+    <div><b>Anchor tx</b> &nbsp;<a href="https://whatsonchain.com/tx/8863f5f50aa975676f63ee56bc0cd1d6a2827c957ddc5c685490dec30ea3b8d6">8863f5f50aa975676f63ee56bc0cd1d6a2827c957ddc5c685490dec30ea3b8d6</a></div>
+    <div style="margin-top:6px"><b>Merkle root</b> &nbsp;908037282a89034a0af1bcf179462c449f07f51405a99d3b710b9f69777662be</div>
+    <div style="margin-top:6px"><b>On-chain</b> &nbsp;OP_RETURN = <code>["bsv.cx","not2","908037…"]</code></div>
+    <div style="margin-top:6px"><b>Entries</b> &nbsp;3 corroborated actions — anchor (BSV) · commit (GitHub) · site (live web)</div>
   </div>
 
   <h2>How it works</h2>

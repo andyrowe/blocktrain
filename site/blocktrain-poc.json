@@ -5,56 +5,78 @@
   "entries": [
     {
       "seq": 0,
-      "ts": "2026-09-01T02:06:24.571Z",
+      "ts": "2026-09-01T12:52:35.946Z",
       "actor": "mike",
-      "kind": "project.init",
+      "kind": "anchor.batch",
       "data": {
-        "project": "blocktrain",
-        "what": "v0.1 pure core: hash-chain + RFC6962 verifier + CLI",
-        "commit": "279c41e"
+        "what": "blocktrain first on-chain memory batch, via bsv.cx not2",
+        "evidence": "corroborated",
+        "capturedBy": "self",
+        "nonce": "906b50814048a367890209568152d81b",
+        "refs": [
+          {
+            "type": "bsv-txid",
+            "value": "48959852d314fe8a47f4ba9816801563260cdbf0b5edde0ebf4f5534113cac58"
+          }
+        ]
       },
-      "entryHash": "08c0d0d8b7221d32e59fece2d4c82c3786166bf93b21c193c8ab22b251d962d7",
-      "linkHash": "a833e75ec580b364dc2297625c3e46efd95acfe83805c84a5671de7e0d3ebbb8"
+      "entryHash": "ff0fb8c711338ffe758f59da83bd18662463532e6dbea133821179886d4ba409",
+      "linkHash": "afbb7f00b5fc83961442548d7ef699e9b90566b02ac9508135a4a1bdfc22b076"
     },
     {
       "seq": 1,
-      "ts": "2026-09-01T02:06:24.653Z",
+      "ts": "2026-09-01T12:52:36.179Z",
       "actor": "mike",
-      "kind": "design.doc",
+      "kind": "code.commit",
       "data": {
-        "doc": "DESIGN.md",
-        "what": "fidelity ladder + context anchoring + blind/envelope-encryption privacy model",
-        "commit": "52722d0"
+        "what": "blocktrain v0.1 source: hash-chain + RFC6962 verifier + CLI",
+        "evidence": "corroborated",
+        "capturedBy": "self",
+        "nonce": "83e55b713ac098123ff23f282e1603f4",
+        "refs": [
+          {
+            "type": "git-commit",
+            "value": "279c41e",
+            "repo": "andyrowe/blocktrain"
+          }
+        ]
       },
-      "entryHash": "691843df38eebbba01c6b073e01829a93677d18374278b3c29494a5ac7ab7af8",
-      "linkHash": "e872fc492f40ee5bcb304a9a49ae004c8eafec433938fcefa8a3072c2252343a"
+      "entryHash": "fb0a331291e49d8bae88c57efb05884749aff872661fe51eaae287915612bedd",
+      "linkHash": "3056751f59910f2333874c20f8bc5ebb1d04f684432c72f1dd1af8d4125cbdef"
     },
     {
       "seq": 2,
-      "ts": "2026-09-01T02:06:24.735Z",
+      "ts": "2026-09-01T12:52:36.408Z",
       "actor": "mike",
-      "kind": "design.doc",
+      "kind": "site.launch",
       "data": {
-        "doc": "ROADMAP.md",
-        "what": "phased path to working PoC",
-        "commit": "e0be772"
+        "what": "public PoC + one-command verifier live",
+        "evidence": "corroborated",
+        "capturedBy": "self",
+        "nonce": "599a05d987ea3b9d336e95033807e14b",
+        "refs": [
+          {
+            "type": "url",
+            "value": "https://blocktrain.org/"
+          }
+        ]
       },
-      "entryHash": "3537469d272fa0111cc1979c3fbc032ef7c5f873a7122b35e2f4ccbe71b06d86",
-      "linkHash": "5e0ebe82280001567a63ffc9fe1378b1be9987b9e84bc13095fdcbe88fde5848"
+      "entryHash": "dc03bed4260f6a4dce97aa06b84a78c13906282171e78b9621cbcb0d3fe1e4f3",
+      "linkHash": "df8dc7ba027ef64c1bb1ae74bb184ad2586432e1fc6f873d181e7de992341392"
     }
   ],
   "seal": {
-    "root": "35eada666d0bc883f286816dbd5e772dca208e0cb0e3dd6501ede5d589f589b1",
-    "txid": "48959852d314fe8a47f4ba9816801563260cdbf0b5edde0ebf4f5534113cac58",
+    "root": "908037282a89034a0af1bcf179462c449f07f51405a99d3b710b9f69777662be",
+    "txid": "8863f5f50aa975676f63ee56bc0cd1d6a2827c957ddc5c685490dec30ea3b8d6",
     "network": "main",
     "fromSeq": 0,
     "toSeq": 2,
     "leaves": [
-      "a833e75ec580b364dc2297625c3e46efd95acfe83805c84a5671de7e0d3ebbb8",
-      "e872fc492f40ee5bcb304a9a49ae004c8eafec433938fcefa8a3072c2252343a",
-      "5e0ebe82280001567a63ffc9fe1378b1be9987b9e84bc13095fdcbe88fde5848"
+      "afbb7f00b5fc83961442548d7ef699e9b90566b02ac9508135a4a1bdfc22b076",
+      "3056751f59910f2333874c20f8bc5ebb1d04f684432c72f1dd1af8d4125cbdef",
+      "df8dc7ba027ef64c1bb1ae74bb184ad2586432e1fc6f873d181e7de992341392"
     ],
     "anchorFormat": "OP_RETURN: bsv.cx / not2 / <root>",
-    "explorer": "https://whatsonchain.com/tx/48959852d314fe8a47f4ba9816801563260cdbf0b5edde0ebf4f5534113cac58"
+    "explorer": "https://whatsonchain.com/tx/8863f5f50aa975676f63ee56bc0cd1d6a2827c957ddc5c685490dec30ea3b8d6"
   }
 }
