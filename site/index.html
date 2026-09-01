@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>blocktrain — verifiable agent memory</title>
 <meta name="description" content="Turn an AI agent's action log into a tamper-evident, timestamped, on-chain record anyone can verify — trusting no one, including us." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://blocktrain.org/" />
+<meta property="og:title" content="blocktrain — verifiable agent memory" />
+<meta property="og:description" content="Proof of what an AI did, not just a note that it did it. Hash-chained, anchored on BSV, verifiable by anyone — trusting no one." />
+<meta property="og:image" content="https://blocktrain.org/og-card.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="blocktrain — verifiable agent memory" />
+<meta name="twitter:description" content="Proof of what an AI did, not just a note that it did it. Verifiable by anyone, trusting no one." />
+<meta name="twitter:image" content="https://blocktrain.org/og-card.png" />
 <style>
   :root { --bg:#0d0f12; --panel:#15181d; --ink:#e8eaed; --dim:#9aa3ad; --line:#242a31;
           --ok:#4ade80; --accent:#6ab7ff; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
@@ -42,6 +51,20 @@
   so any third party can later verify what happened and when — with no access to the operator's
   database, and even if blocktrain disappears.</p>
 
+  <h2>Why not just a signed log file?</h2>
+  <p>Because a log you control is only as trustworthy as you are. A signed file proves <em>you</em>
+  stand behind it; it can't prove you didn't quietly rewrite it before signing, and it means nothing
+  to someone who doesn't already trust you. blocktrain is for the moments where your word isn't
+  enough:</p>
+  <ul>
+    <li>an agent acting <b>on a user's behalf</b>, where the user wants proof of what it did with their money or account;</li>
+    <li>a <b>public agent</b> whose audience audits its posts and spends;</li>
+    <li>a <b>dispute</b> — "your agent did X" / "no it didn't" — settled by the chain, not by whoever holds the database;</li>
+    <li>a <b>counterparty or regulator</b> who needs an operator-independent trail.</li>
+  </ul>
+  <p>If your audit is always inside your own org, you don't need this. The moment a second party
+  has to believe you, you do.</p>
+
   <h2>Try it — verify this page's own proof, trusting no one</h2>
   <p>The bundle below records blocktrain documenting its <em>own creation</em>. Verify it end-to-end
   with a zero-dependency script (Node ≥ 18). It recomputes the hash-chain, folds each Merkle proof,
@@ -59,6 +82,7 @@ node verify.mjs blocktrain-poc.json</pre>
     <div><b>Anchor tx</b> &nbsp;<a href="https://whatsonchain.com/tx/48959852d314fe8a47f4ba9816801563260cdbf0b5edde0ebf4f5534113cac58">48959852d314fe8a47f4ba9816801563260cdbf0b5edde0ebf4f5534113cac58</a></div>
     <div style="margin-top:6px"><b>Merkle root</b> &nbsp;35eada666d0bc883f286816dbd5e772dca208e0cb0e3dd6501ede5d589f589b1</div>
     <div style="margin-top:6px"><b>On-chain</b> &nbsp;OP_RETURN = <code>["bsv.cx","not2","35eada66…"]</code></div>
+    <div style="margin-top:6px"><b>Anchored</b> &nbsp;block 964,785 · 2026-09-01 02:17 UTC</div>
   </div>
 
   <h2>How it works</h2>
@@ -72,6 +96,23 @@ node verify.mjs blocktrain-poc.json</pre>
       <code>OP_RETURN</code>-anchored on the public chain. The chain is the ground truth; no server
       is trusted, including ours.</li>
   </ol>
+
+  <h2>Use it on your agent</h2>
+  <p>Node ≥ 24. The content you log stays private — only hashes are anchored.</p>
+  <pre>git clone https://github.com/andyrowe/blocktrain
+cd blocktrain && npm install
+
+# record what your agent did
+blocktrain append --actor my-agent --kind payment --data '{"to":"acme","sats":50000}'
+
+# seal pending entries into one on-chain batch (small bsv.cx fee)
+blocktrain seal
+
+# anyone can verify — trusting no one
+blocktrain verify --spv</pre>
+  <p class="kv">Prefer it automatic? Wire the PostToolUse hook and every outward action your agent
+  takes is captured with no code changes —
+  <a href="https://github.com/andyrowe/blocktrain#readme">see the repo</a>. SDK + hosted API on the roadmap.</p>
 
   <h2>Honest scope</h2>
   <div class="panel scope">
