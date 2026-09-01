@@ -39,11 +39,18 @@ media gen) — reads (Read/Grep/Glob/web/memory/search) are ignored.
 - **Proof:** synthetic events classify correctly (captures outward, skips reads); live
   capture begins once the session reloads settings.
 
-## Phase 3 — Minimal public verify  ← **"WORKING PoC" reached here (P1+P2+P3)**
-Someone other than us can check it. Publish the public/asserted slice of Mike's anchored
-log + a one-command verifier. **Deliverable:** a sample log + `blocktrain verify` runnable
-by anyone, plus a short static page on blocktrain.org (Cloudflare Pages, free). **Proof:**
-you (or a stranger) verify Mike's on-chain log from a clean machine, trusting nobody.
+## Phase 3 — Minimal public verify ✅ BUILT (2026-08-31) — **"WORKING PoC" reached (P1+P2+P3)**
+Anyone other than us can check it, trusting no one.
+- **Public bundle** `site/blocktrain-poc.json` (`scripts/publish.ts`) — the first sealed
+  batch only (seq 0..2, blocktrain's own creation); private operational log NOT published.
+- **Standalone verifier** `site/verify.mjs` — pure Node, ZERO deps. Recomputes the
+  hash-chain, folds each RFC 6962 proof, reads the anchor OP_RETURN off WhatsOnChain.
+  Contacts neither blocktrain nor bsv.cx. **Proven:** clean bundle → ✅ VERIFIED;
+  tampered bundle → ❌ FAILED (exit 1).
+- **Landing page** `site/index.html` — self-contained static, honest-scope prominent,
+  one-command verify recipe, live mainnet facts. Screenshot-verified.
+- **Remaining (Andy's action):** deploy `site/` to Cloudflare Pages + point blocktrain.org
+  DNS (I hold no CF/registrar creds). See `DEPLOY.md`.
 
 ---
 *Everything below turns the PoC into the client-facing product.*

@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "project": "blocktrain",
+  "note": "Self-contained public proof of a blocktrain memory batch. Verify with verify.mjs — it recomputes the hash-chain, folds each Merkle inclusion proof, and reads the anchor tx's OP_RETURN straight off the public BSV chain. Trusts no server, including bsv.cx.",
+  "entries": [
+    {
+      "seq": 0,
+      "ts": "2026-09-01T02:06:24.571Z",
+      "actor": "mike",
+      "kind": "project.init",
+      "data": {
+        "project": "blocktrain",
+        "what": "v0.1 pure core: hash-chain + RFC6962 verifier + CLI",
+        "commit": "279c41e"
+      },
+      "entryHash": "08c0d0d8b7221d32e59fece2d4c82c3786166bf93b21c193c8ab22b251d962d7",
+      "linkHash": "a833e75ec580b364dc2297625c3e46efd95acfe83805c84a5671de7e0d3ebbb8"
+    },
+    {
+      "seq": 1,
+      "ts": "2026-09-01T02:06:24.653Z",
+      "actor": "mike",
+      "kind": "design.doc",
+      "data": {
+        "doc": "DESIGN.md",
+        "what": "fidelity ladder + context anchoring + blind/envelope-encryption privacy model",
+        "commit": "52722d0"
+      },
+      "entryHash": "691843df38eebbba01c6b073e01829a93677d18374278b3c29494a5ac7ab7af8",
+      "linkHash": "e872fc492f40ee5bcb304a9a49ae004c8eafec433938fcefa8a3072c2252343a"
+    },
+    {
+      "seq": 2,
+      "ts": "2026-09-01T02:06:24.735Z",
+      "actor": "mike",
+      "kind": "design.doc",
+      "data": {
+        "doc": "ROADMAP.md",
+        "what": "phased path to working PoC",
+        "commit": "e0be772"
+      },
+      "entryHash": "3537469d272fa0111cc1979c3fbc032ef7c5f873a7122b35e2f4ccbe71b06d86",
+      "linkHash": "5e0ebe82280001567a63ffc9fe1378b1be9987b9e84bc13095fdcbe88fde5848"
+    }
+  ],
+  "seal": {
+    "root": "35eada666d0bc883f286816dbd5e772dca208e0cb0e3dd6501ede5d589f589b1",
+    "txid": "48959852d314fe8a47f4ba9816801563260cdbf0b5edde0ebf4f5534113cac58",
+    "network": "main",
+    "fromSeq": 0,
+    "toSeq": 2,
+    "leaves": [
+      "a833e75ec580b364dc2297625c3e46efd95acfe83805c84a5671de7e0d3ebbb8",
+      "e872fc492f40ee5bcb304a9a49ae004c8eafec433938fcefa8a3072c2252343a",
+      "5e0ebe82280001567a63ffc9fe1378b1be9987b9e84bc13095fdcbe88fde5848"
+    ],
+    "anchorFormat": "OP_RETURN: bsv.cx / not2 / <root>",
+    "explorer": "https://whatsonchain.com/tx/48959852d314fe8a47f4ba9816801563260cdbf0b5edde0ebf4f5534113cac58"
+  }
+}
