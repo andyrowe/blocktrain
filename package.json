@@ -1,0 +1,18 @@
+{
+  "name": "blocktrain",
+  "version": "0.1.0",
+  "description": "Verifiable agent memory: a hash-chained, append-only event log anchored on-chain via bsv.cx (RFC 6962 batches), verifiable by anyone trusting no one.",
+  "type": "module",
+  "bin": {
+    "blocktrain": "bin/blocktrain.ts"
+  },
+  "scripts": {
+    "test": "node test/merkle.test.ts && node test/chain.test.ts",
+    "cli": "node bin/blocktrain.ts"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "license": "MIT",
+  "private": true
+}
