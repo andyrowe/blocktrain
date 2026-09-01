@@ -141,5 +141,37 @@ try {
   fail("chain read failed: " + e.message);
 }
 
-console.log(`\n${ok ? "✅ VERIFIED — batch existed, in order, anchored on-chain. No trust required." : "❌ VERIFICATION FAILED"}`);
+// 4) external corroboration — check any entry refs against their real-world source
+const allRefs = entries.flatMap((e) => (Array.isArray(e.data?.refs) ? e.data.refs.map((r) => ({ seq: e.seq, r })) : []));
+if (allRefs.length) {
+  console.log("4) external corroboration (refs checked against WhatsOnChain / GitHub / the open web)");
+  for (const { seq, r } of allRefs) {
+    try {
+      let res;
+      if (r.type === "bsv-txid") {
+        const ok2 = (await fetch(`https://api.whatsonchain.com/v1/bsv/main/tx/hash/${r.value}`)).ok;
+        res = ok2 ? "on-chain" : "NOT FOUND";
+        if (!ok2) fail(`seq ${seq} bsv-txid not found`);
+      } else if (r.type === "git-commit") {
+        const gh = await fetch(`https://api.github.com/repos/${r.repo}/commits/${r.value}`, { headers: { "user-agent": "blocktrain-verify" } });
+        res = gh.ok ? `commit in ${r.repo}` : "NOT FOUND";
+        if (!gh.ok) fail(`seq ${seq} git-commit not found`);
+      } else if (r.type === "url") {
+        if (r.sha256) {
+          const body = new Uint8Array(await (await fetch(r.value)).arrayBuffer());
+          const got = Buffer.from(await import("node:crypto").then((c) => c.createHash("sha256").update(body).digest())).toString("hex");
+          res = got === r.sha256.toLowerCase() ? "content sha256 matches" : "CONTENT MISMATCH";
+          if (got !== r.sha256.toLowerCase()) fail(`seq ${seq} url content mismatch`);
+        } else {
+          const ok2 = (await fetch(r.value, { method: "HEAD" })).ok;
+          res = ok2 ? "live" : "DEAD";
+          if (!ok2) fail(`seq ${seq} url dead`);
+        }
+      } else { res = "unknown ref type"; fail(`seq ${seq} unknown ref`); }
+      console.log(`  ${res.startsWith("NOT") || res.includes("MISMATCH") || res === "DEAD" ? "✗" : "✓"} seq ${seq} ${r.type} — ${res}`);
+    } catch (e) { fail(`seq ${seq} ref check error: ${e.message}`); }
+  }
+}
+
+console.log(`\n${ok ? "✅ VERIFIED — batch existed, in order, anchored on-chain" + (allRefs.length ? ", refs corroborated" : "") + ". No trust required." : "❌ VERIFICATION FAILED"}`);
 process.exit(ok ? 0 : 1);

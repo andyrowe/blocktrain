@@ -23,6 +23,11 @@ function arg(flag: string): string | undefined {
   const i = process.argv.indexOf(flag);
   return i >= 0 ? process.argv[i + 1] : undefined;
 }
+function argsAll(flag: string): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < process.argv.length; i++) if (process.argv[i] === flag) out.push(process.argv[i + 1]);
+  return out;
+}
 function has(flag: string): boolean {
   return process.argv.includes(flag);
 }
@@ -41,10 +46,23 @@ async function main() {
       } catch {
         data = dataRaw; // allow a plain string payload
       }
+      // P4: external refs (repeatable --ref) make the entry corroborated/falsifiable.
+      const { parseRefArg } = await import("../src/refs.ts");
+      const { randomBytes } = await import("node:crypto");
+      const refs = argsAll("--ref").map(parseRefArg);
+      const evidence = arg("--evidence") ?? (refs.length ? "corroborated" : "structured");
+      const baseObj = data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : { value: data };
+      const enriched = {
+        ...baseObj,
+        evidence,
+        capturedBy: "self",
+        nonce: randomBytes(16).toString("hex"),
+        ...(refs.length ? { refs } : {}),
+      };
       const log = readLog(LOG);
-      const entry = appendEntry(log, { actor, kind, data });
+      const entry = appendEntry(log, { actor, kind, data: enriched });
       appendLog(LOG, entry);
-      console.log(`appended seq=${entry.seq} kind=${kind}`);
+      console.log(`appended seq=${entry.seq} kind=${kind} evidence=${evidence}${refs.length ? ` refs=${refs.length}` : ""}`);
       console.log(`  entryHash ${entry.entryHash}`);
       console.log(`  linkHash  ${entry.linkHash}`);
       break;
@@ -141,6 +159,23 @@ async function main() {
         }
         console.log(`seal seq ${s.fromSeq}..${s.toSeq} root ${s.root.slice(0, 16)}… txid ${s.txid.slice(0, 12)}… ${spvNote}`);
         anchorsOk++;
+      }
+      // P4: corroborate external refs against the real world (WoC / GitHub / the open web).
+      if (has("--refs")) {
+        const { verifyRef } = await import("../src/refs.ts");
+        let checked = 0, okc = 0;
+        for (const e of log) {
+          const refs = (e.data as { refs?: unknown[] })?.refs;
+          if (!Array.isArray(refs)) continue;
+          for (const ref of refs) {
+            const r = await verifyRef(ref as never);
+            checked++;
+            if (r.ok) okc++;
+            console.log(`ref seq ${e.seq} ${(ref as { type: string }).type} ${r.ok ? "✓" : "✗"} ${r.detail}`);
+          }
+        }
+        console.log(`refs: ${okc}/${checked} corroborated against external sources`);
+        if (checked > 0 && okc < checked) process.exit(1);
       }
       const sealed = sealedThrough(sf.seals);
       const unsealed = log.length - 1 - sealed;
