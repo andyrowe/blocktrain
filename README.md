@@ -57,6 +57,15 @@ npm test    # RFC 6962 Merkle vectors + hash-chain tamper-detection
 
 Requires Node >= 24 (native TypeScript). Dependency-free: Node built-in crypto + fetch.
 
+## Design & privacy
+
+See [`DESIGN.md`](./DESIGN.md) for the full rationale: the fidelity ladder (asserted →
+mechanical → corroborated), action-time **context anchoring**, and the privacy model —
+the chain only ever holds a hash, contents are held off-chain **encrypted**, with
+**blind anchoring** the default (blocktrain can't read your logs) and **envelope
+encryption** for multi-party access (client, lawyers, a counterparty) without breaking
+blindness.
+
 ## Status
 
 Alpha. Pure core + CLI + offline verification proven. First real mainnet anchor pending.
