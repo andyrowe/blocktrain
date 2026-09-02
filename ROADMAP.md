@@ -7,6 +7,17 @@ third party can independently verify, trusting no one.
 
 Spend key: 💸 = spends BSV float (tiny, one tx per seal); everything else is free.
 
+## Live status (2026-09-02)
+**Working PoC shipped and public.** Site live at **blocktrain.org** (Cloudflare Pages),
+public repo **github.com/andyrowe/blocktrain** (Apache-2.0). Done: P0–P4 + brand. The site
+shows three real corroborated actions anyone can verify trusting no one.
+**Open items:** (a) CF auto-deploy — needs 2 GitHub secrets (`CLOUDFLARE_API_TOKEN`,
+`CLOUDFLARE_ACCOUNT_ID`) + Pages project name to confirm, then no more manual zips;
+(b) next build = live miner-train viz (P4.6); (c) strategic = name a real cross-party payer
++ add a "who it's for / contact" path before pouring weeks into P5; (d) runnable-quickstart
+fix from the cold read (the `blocktrain` CLI needs `npm link`/`node bin/...`, and `seal` needs
+a funded WIF — the site's get-started doesn't say so yet).
+
 ---
 
 ## Phase 0 — Pure core ✅ DONE
@@ -55,11 +66,28 @@ Anyone other than us can check it, trusting no one.
 ---
 *Everything below turns the PoC into the client-facing product.*
 
-## Phase 4 — Corroboration + refs (fidelity: corroborated)
-Entries commit external artifacts so a claim is falsifiable. Add `evidence`, `refs`,
-`capturedBy`, `nonce` to the schema (per DESIGN §9); capture layer fills `refs` from action
-results (txid, post URL, git sha). **Proof:** an entry whose ref an outsider checks against
-the real world (e.g. a live Twetch URL or a bsv.cx txid).
+## Phase 4 — Corroboration + refs (fidelity: corroborated) ✅ DONE (2026-09-01)
+Entries carry external refs so a claim is falsifiable against the real world.
+`src/refs.ts` `verifyRef`: `bsv-txid`→WhatsOnChain, `git-commit`→GitHub, `url`→liveness or
+optional `::sha256` content hash. CLI `append --ref type:value` sets `evidence:"corroborated"`;
+`verify --refs` + the standalone `site/verify.mjs` (now **4 layers**) check them.
+- **Proven:** real refs corroborate (anchor txid on-chain, commit on GitHub, URL content hash);
+  fabricated refs fail (404/422, exit 1). 20/20 tests.
+- **Public demo upgraded:** blocktrain.org bundle is now **three real corroborated actions**
+  (batch #2 anchor `8863f5f5…`), not the self-referential one.
+
+## Phase 4.5 — Brand ✅ DONE (2026-09-02)
+Logo adopted (concept 05): BLOCK banana-yellow / TRAIN dark hash-cells + green "verify"
+chevron. `site/assets/logo/` (lockup + favicon SVG), wired into header + favicon + OG card.
+Yellow = a nod to GorillaPool (mined our first anchor); real miner-coloring belongs in the
+live miner-train (below), kept distinct from the static brand mark.
+
+## Phase 4.6 — Live miner-train viz (NEXT, free)
+Render a proof as a train whose cars are the **blocks** each batch anchored into, **colored by
+the miner** that mined them (reuse chainhealth's coinbase attribution: GorillaPool-yellow,
+TAAL, Mempool, SVPool, neutral for unknown/solo; a signature color if Andy's own S19 mines one).
+Data-bound + verifiable (colors derive from public coinbase data). Goes on the verify page.
+**Proof:** our two anchors render correctly — batch #1 = GorillaPool-yellow (block 964785).
 
 ## Phase 5 — Privacy: encryption + blind anchoring
 Payload + context stored encrypted; chain stays hash-only; blocktrain blind by default.
