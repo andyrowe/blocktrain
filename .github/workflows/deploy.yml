@@ -24,4 +24,4 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           # If your Pages project has a different name, change --project-name below.
-          command: pages deploy site --project-name=blocktrain --branch=main --commit-dirty=true
+          command: pages project list
