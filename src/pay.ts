@@ -19,15 +19,40 @@ const b64 = {
   decode: (s: string) => JSON.parse(Buffer.from(s, "base64").toString("utf8")),
 };
 
-function netFromCaip2(id: string): "main" | "test" {
+// Resolve the CAIP-2 network id to a chain. Refuses to guess: an unrecognized id throws,
+// so we never accidentally pay real mainnet coin against a malformed/tampered challenge.
+export function netFromCaip2(id: string): "main" | "test" {
   const ref = id.split(":")[1] ?? "";
   if (id.startsWith("bsv:")) {
     if (ref === "mainnet") return "main";
     if (ref === "testnet") return "test";
   }
-  // legacy bip122:<genesis> — assume main unless it's the known testnet genesis
-  if (ref.startsWith("000000000933ea01ad0ee984209779ba")) return "test";
-  return "main";
+  if (id.startsWith("bip122:")) {
+    if (ref.startsWith("000000000019d6689c085ae165831e93")) return "main";
+    if (ref.startsWith("000000000933ea01ad0ee984209779ba")) return "test";
+  }
+  throw new Error(`unrecognized network '${id}' — refusing to guess which chain to pay on`);
+}
+
+// Guard rails for auto-payment: validate the amount is a positive integer within a hard
+// sats cap, and that the network is one we recognize. Pure + testable. The cap defaults to
+// 100k sats (the anchor is ~300) and is overridable via BLOCKTRAIN_MAX_PAY_SATS.
+export function resolvePayment(
+  amountRaw: unknown,
+  network: unknown,
+  maxSats = Number(process.env.BLOCKTRAIN_MAX_PAY_SATS ?? "100000"),
+): { amount: number; net: "main" | "test" } {
+  const amount = Number(amountRaw);
+  if (!Number.isInteger(amount) || amount <= 0) {
+    throw new Error(`refusing to pay: invalid amount ${JSON.stringify(amountRaw)}`);
+  }
+  if (amount > maxSats) {
+    throw new Error(`refusing to pay ${amount} sats — exceeds cap ${maxSats} (set BLOCKTRAIN_MAX_PAY_SATS to override)`);
+  }
+  if (typeof network !== "string" || !network) {
+    throw new Error("refusing to pay: offer has no network id");
+  }
+  return { amount, net: netFromCaip2(network) };
 }
 
 export type PaidResult<T> = { data: T; settlementTxid: string };
@@ -48,8 +73,7 @@ export async function postPaid<T>(url: string, body: unknown, wif: string): Prom
   const offer = required.accepts?.find((a: { scheme: string }) => PAY_SCHEMES.has(a.scheme));
   if (!offer) throw new Error(`no payable offer in 402 accepts: ${JSON.stringify(required.accepts)}`);
 
-  const amount = Number(offer.amount);
-  const net = netFromCaip2(offer.network ?? "bsv:mainnet");
+  const { amount, net } = resolvePayment(offer.amount, offer.network);
   const key = PrivateKey.fromWif(wif);
   const payerAddr = key.toAddress(net === "main" ? "mainnet" : "testnet");
   const WOC = `https://api.whatsonchain.com/v1/bsv/${net}`;

@@ -12,7 +12,7 @@
 // Reads (Read/Grep/Glob/search/fetch) are ignored — noise + privacy.
 
 import { createHash, randomBytes } from "node:crypto";
-import { openSync, closeSync, unlinkSync, appendFileSync } from "node:fs";
+import { openSync, closeSync, unlinkSync, appendFileSync, statSync } from "node:fs";
 import { canonicalize } from "./canonical.ts";
 import { readLog, type LogEntry } from "./store.ts";
 import { appendEntry } from "./chain.ts";
@@ -113,14 +113,21 @@ export function classify(ev: ToolEvent): Classified {
 
 // Locked append so concurrent PostToolUse hooks can't corrupt the hash-chain.
 function withLock<T>(lockPath: string, fn: () => T): T {
+  const STALE_MS = 5000; // a hook run is <2s; a lock older than this was left by a crash
   let fd: number | null = null;
   for (let i = 0; i < 100; i++) {
     try {
       fd = openSync(lockPath, "wx"); // O_EXCL: fails if lock exists
       break;
     } catch {
-      // busy-wait a few ms (synchronous; hooks are short-lived processes)
-      const until = Date.now() + 15;
+      // Break a stale lock left by a crashed/reaped hook, so capture can't wedge forever.
+      try {
+        if (Date.now() - statSync(lockPath).mtimeMs > STALE_MS) {
+          unlinkSync(lockPath);
+          continue; // retry immediately
+        }
+      } catch { /* lock vanished between open and stat — just retry */ }
+      const until = Date.now() + 15; // busy-wait a few ms (hooks are short-lived processes)
       while (Date.now() < until) { /* spin */ }
     }
   }
