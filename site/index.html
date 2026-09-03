@@ -116,6 +116,11 @@ blocktrain append --actor my-agent --kind payment --data '{"to":"acme","sats":50
 blocktrain append --actor my-agent --kind deploy --data '{"service":"api"}' \
   --ref git-commit:&lt;sha&gt;:you/repo
 
+# commit the decision-time context too (anchored at action-time — can't be backfilled)
+blocktrain append --actor my-agent --kind payment --data '{"to":"acme"}' \
+  --context ./model-input.json
+blocktrain context --seq 3        # show the context + prove it matches the committed hash
+
 # seal pending entries into one on-chain batch — needs a funded mainnet key
 # (pays a small bsv.cx fee): export BLOCKTRAIN_PAY_WIF=&lt;your-wif&gt;
 blocktrain seal

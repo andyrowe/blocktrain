@@ -54,6 +54,15 @@ export function computeEntryHash(
   return sha256hex(Buffer.from(canonicalize(entryTuple(e)), "utf8"));
 }
 
+// P6 context anchoring: commit the agent's decision-time context (model input / retrieved
+// state) as sha256(nonce ‖ context). Placed in the entry's data, so it's part of entryHash →
+// linkHash → the on-chain anchor: the commitment is timestamped at action-time and cannot be
+// backfilled with a more flattering context later. (It proves what the agent CLAIMS it knew
+// when it acted — not that the context caused the action; LLMs aren't bit-replayable.)
+export function computeContextHash(nonceHex: string, context: Buffer): string {
+  return sha256hex(Buffer.concat([Buffer.from(nonceHex, "hex"), context]));
+}
+
 export function computeLinkHash(prevLinkHex: string | null, entryHashHex: string): string {
   const prev = prevLinkHex ? Buffer.from(prevLinkHex, "hex") : GENESIS;
   return sha256hex(Buffer.concat([prev, Buffer.from(entryHashHex, "hex")]));

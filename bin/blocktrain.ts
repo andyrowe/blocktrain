@@ -52,19 +52,44 @@ async function main() {
       const refs = argsAll("--ref").map(parseRefArg);
       const evidence = arg("--evidence") ?? (refs.length ? "corroborated" : "structured");
       const baseObj = data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : { value: data };
+      const nonce = randomBytes(16).toString("hex");
+      const encTo = argsAll("--encrypt-to");
+      // P6: --context <file> / --context-data <string> commits the decision-time context as
+      // contextHash = sha256(nonce ‖ context), inside the entry (so it's anchored at action-time
+      // and can't be backfilled). The snapshot is stored in a sidecar (encrypted if --encrypt-to).
+      const ctxFile = arg("--context");
+      const ctxInline = arg("--context-data");
+      let ctxBlob: Buffer | null = null;
+      if (ctxFile) ctxBlob = readFileSync(ctxFile);
+      else if (ctxInline != null) ctxBlob = Buffer.from(ctxInline, "utf8");
+      let contextHash: string | undefined;
+      if (ctxBlob) {
+        const { computeContextHash } = await import("../src/chain.ts");
+        contextHash = computeContextHash(nonce, ctxBlob);
+      }
       const enriched = {
         ...baseObj,
         evidence,
         capturedBy: "self",
-        nonce: randomBytes(16).toString("hex"),
+        nonce,
         ...(refs.length ? { refs } : {}),
+        ...(contextHash ? { contextHash } : {}),
       };
       const log = readLog(LOG);
       const entry = appendEntry(log, { actor, kind, data: enriched });
+      // store the context snapshot in its sidecar (keyed by contextHash), encrypted if requested
+      if (ctxBlob && contextHash) {
+        const { writeContext } = await import("../src/store.ts");
+        if (encTo.length) {
+          const { encryptFor } = await import("../src/crypto.ts");
+          writeContext(LOG, contextHash, Buffer.from(JSON.stringify(encryptFor(ctxBlob, encTo)), "utf8"), true);
+        } else {
+          writeContext(LOG, contextHash, ctxBlob, false);
+        }
+      }
       // P5: --encrypt-to <pub> (repeatable) stores the payload as an encrypted envelope
       // instead of plaintext. The hashes still commit the plaintext, so the chain/anchor are
       // unchanged and a key-holder can later prove the ciphertext matches (see `reveal`).
-      const encTo = argsAll("--encrypt-to");
       let stored: Record<string, unknown> = entry;
       if (encTo.length) {
         const { encryptFor } = await import("../src/crypto.ts");
@@ -73,7 +98,7 @@ async function main() {
         stored = { seq: entry.seq, ts: entry.ts, actor: entry.actor, kind: entry.kind, enc: env, entryHash: entry.entryHash, linkHash: entry.linkHash };
       }
       appendLog(LOG, stored as never);
-      console.log(`appended seq=${entry.seq} kind=${kind} evidence=${evidence}${refs.length ? ` refs=${refs.length}` : ""}${encTo.length ? ` encrypted→${encTo.length} recipient(s)` : ""}`);
+      console.log(`appended seq=${entry.seq} kind=${kind} evidence=${evidence}${refs.length ? ` refs=${refs.length}` : ""}${contextHash ? " +context" : ""}${encTo.length ? ` encrypted→${encTo.length} recipient(s)` : ""}`);
       console.log(`  entryHash ${entry.entryHash}`);
       console.log(`  linkHash  ${entry.linkHash}`);
       break;
@@ -244,6 +269,40 @@ async function main() {
       console.log(`seq ${seq} kind=${e.kind}`);
       console.log(`  decrypted: ${JSON.stringify(data)}`);
       console.log(`  content integrity: ${good ? "✓ matches the committed on-chain hash" : "✗ MISMATCH"}`);
+      if (!good) process.exit(1);
+      break;
+    }
+
+    case "context": {
+      const seq = Number(arg("--seq"));
+      const wif = arg("--key");
+      if (Number.isNaN(seq)) throw new Error("context: --seq <n> required (--key <wif> if encrypted)");
+      const log = readLog(LOG);
+      const e = log[seq] as { data?: { nonce?: string; contextHash?: string }; enc?: unknown };
+      if (!e) throw new Error(`no entry at seq ${seq}`);
+      // get the entry data (decrypt the entry first if it's encrypted) to read nonce+contextHash
+      let edata = e.data;
+      if (e.enc) {
+        if (!wif) { console.error("encrypted entry — pass --key <wif>"); process.exit(1); }
+        const { decryptWith } = await import("../src/crypto.ts");
+        edata = JSON.parse(decryptWith(e.enc as never, wif).toString("utf8"));
+      }
+      const nonce = edata?.nonce, contextHash = edata?.contextHash;
+      if (!contextHash || !nonce) { console.log(`seq ${seq} has no committed context`); break; }
+      const { readContext } = await import("../src/store.ts");
+      const rec = readContext(LOG, contextHash);
+      if (!rec) { console.error(`context snapshot for seq ${seq} not found in sidecar`); process.exit(1); }
+      let blob = rec.data;
+      if (rec.encrypted) {
+        if (!wif) { console.error("context is encrypted — pass --key <wif>"); process.exit(1); }
+        const { decryptWith } = await import("../src/crypto.ts");
+        blob = decryptWith(JSON.parse(rec.data.toString("utf8")) as never, wif);
+      }
+      const { computeContextHash } = await import("../src/chain.ts");
+      const good = computeContextHash(nonce, blob) === contextHash;
+      console.log(`seq ${seq} context (${blob.length} bytes):`);
+      console.log(blob.toString("utf8").slice(0, 2000));
+      console.log(`  commitment: ${good ? "✓ matches the contextHash committed at action-time (not backfilled)" : "✗ MISMATCH — snapshot altered or wrong"}`);
       if (!good) process.exit(1);
       break;
     }

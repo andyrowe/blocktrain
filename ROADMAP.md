@@ -101,10 +101,13 @@ content-integrity to a key-holder (`reveal` recomputes the committed hash after 
 - **Scope:** payload encrypted; structural metadata (kind/actor/ts) stays visible. Hosted
   blind-anchor service is still P8.
 
-## Phase 6 — Context anchoring
-Each action also commits `contextHash` = `sha256(nonce ‖ model-input snapshot)` at
-action-time (encrypted snapshot off-chain). **Proof:** demonstrate the committed context
-can't be backfilled after the outcome (hash was fixed before) — the anti-hindsight property.
+## Phase 6 — Context anchoring ✅ DONE (2026-09-02)
+Each entry can commit `contextHash = sha256(nonce ‖ context)` (`computeContextHash`), placed in
+the entry data so it's anchored at action-time and can't be backfilled. Snapshot stored in a
+sidecar `context/<hash>.{bin,enc}` (encrypted if `--encrypt-to`). CLI: `append --context <file>` /
+`--context-data <str>`; `context --seq [--key]` decrypts + verifies the snapshot against the
+committed hash. **Proven:** live commit verifies ✓; a tampered/backfilled snapshot → ✗ MISMATCH;
+3 unit tests. Honest limit: proves what the agent *claims* it knew, not that context caused the action.
 
 ## Phase 7 — Shared verifiable room (product direction)
 A joint log between two contracting parties: one scope, encrypted to both, both

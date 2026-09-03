@@ -52,6 +52,30 @@ export function writeSeals(path: string, data: SealFile): void {
   writeFileSync(path, JSON.stringify(data, null, 2) + "\n", "utf8");
 }
 
+// --- context snapshots (P6) ---------------------------------------------------------
+// Snapshots live in a sidecar dir keyed by their contextHash, off the main log (they can be
+// large). Stored raw (.bin) or as an encryption envelope (.enc). The entry only carries the
+// hash, so the log stays lean and context can be disclosed selectively.
+import { join } from "node:path";
+function contextDir(logPath: string): string {
+  return join(dirname(logPath) || ".", "context");
+}
+export function writeContext(logPath: string, hash: string, data: Buffer, encrypted: boolean): string {
+  const dir = contextDir(logPath);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const p = join(dir, hash + (encrypted ? ".enc" : ".bin"));
+  writeFileSync(p, data);
+  return p;
+}
+export function readContext(logPath: string, hash: string): { data: Buffer; encrypted: boolean } | null {
+  const dir = contextDir(logPath);
+  const enc = join(dir, hash + ".enc");
+  const raw = join(dir, hash + ".bin");
+  if (existsSync(enc)) return { data: readFileSync(enc), encrypted: true };
+  if (existsSync(raw)) return { data: readFileSync(raw), encrypted: false };
+  return null;
+}
+
 // Which sequence numbers are already covered by a seal.
 export function sealedThrough(seals: Seal[]): number {
   let max = -1;
