@@ -1,40 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 536 64" role="img" aria-label="blocktrain">
-  <!-- BLOCK: GorillaPool banana-yellow cells -->
+  <!-- BLOCK: blue cells -->
   <g font-family="Arial, DejaVu Sans, sans-serif" font-weight="800" font-size="24" text-anchor="middle">
-    <rect x="2"   y="8" width="42" height="44" rx="5" fill="#f6c445"/><text x="23"  y="39" fill="#2a1e00">B</text>
-    <rect x="52"  y="8" width="42" height="44" rx="5" fill="#f6c445"/><text x="73"  y="39" fill="#2a1e00">L</text>
-    <rect x="102" y="8" width="42" height="44" rx="5" fill="#f6c445"/><text x="123" y="39" fill="#2a1e00">O</text>
-    <rect x="152" y="8" width="42" height="44" rx="5" fill="#f6c445"/><text x="173" y="39" fill="#2a1e00">C</text>
-    <rect x="202" y="8" width="42" height="44" rx="5" fill="#f6c445"/><text x="223" y="39" fill="#2a1e00">K</text>
+    <rect x="2"   y="8" width="42" height="44" rx="5" fill="#6ab7ff"/><text x="23"  y="39" fill="#0b1a2b">B</text>
+    <rect x="52"  y="8" width="42" height="44" rx="5" fill="#6ab7ff"/><text x="73"  y="39" fill="#0b1a2b">L</text>
+    <rect x="102" y="8" width="42" height="44" rx="5" fill="#6ab7ff"/><text x="123" y="39" fill="#0b1a2b">O</text>
+    <rect x="152" y="8" width="42" height="44" rx="5" fill="#6ab7ff"/><text x="173" y="39" fill="#0b1a2b">C</text>
+    <rect x="202" y="8" width="42" height="44" rx="5" fill="#6ab7ff"/><text x="223" y="39" fill="#0b1a2b">K</text>
 
-    <!-- TRAIN: dark hash-cells (independent / unknown miners) with fixed hex -->
-    <g>
-      <rect x="252" y="8" width="42" height="44" rx="5" fill="#14181e" stroke="#39434f" stroke-width="1.5"/>
-      <text x="273" y="39" fill="#e8eaed">T</text>
-      <text x="257" y="19" font-family="ui-monospace, monospace" font-weight="400" font-size="8" text-anchor="start" fill="#4ade80" opacity=".55">e9</text>
-      <text x="281" y="49" font-family="ui-monospace, monospace" font-weight="400" font-size="8" text-anchor="start" fill="#e8eaed" opacity=".3">bc</text>
-
-      <rect x="302" y="8" width="42" height="44" rx="5" fill="#14181e" stroke="#39434f" stroke-width="1.5"/>
-      <text x="323" y="39" fill="#e8eaed">R</text>
-      <text x="307" y="19" font-family="ui-monospace, monospace" font-weight="400" font-size="8" text-anchor="start" fill="#4ade80" opacity=".55">63</text>
-      <text x="331" y="49" font-family="ui-monospace, monospace" font-weight="400" font-size="8" text-anchor="start" fill="#e8eaed" opacity=".3">02</text>
-
-      <rect x="352" y="8" width="42" height="44" rx="5" fill="#14181e" stroke="#39434f" stroke-width="1.5"/>
-      <text x="373" y="39" fill="#e8eaed">A</text>
-      <text x="357" y="19" font-family="ui-monospace, monospace" font-weight="400" font-size="8" text-anchor="start" fill="#4ade80" opacity=".55">2c</text>
-      <text x="381" y="49" font-family="ui-monospace, monospace" font-weight="400" font-size="8" text-anchor="start" fill="#e8eaed" opacity=".3">28</text>
-
-      <rect x="402" y="8" width="42" height="44" rx="5" fill="#14181e" stroke="#39434f" stroke-width="1.5"/>
-      <text x="423" y="39" fill="#e8eaed">I</text>
-      <text x="407" y="19" font-family="ui-monospace, monospace" font-weight="400" font-size="8" text-anchor="start" fill="#4ade80" opacity=".55">f9</text>
-      <text x="431" y="49" font-family="ui-monospace, monospace" font-weight="400" font-size="8" text-anchor="start" fill="#e8eaed" opacity=".3">c8</text>
-
-      <rect x="452" y="8" width="42" height="44" rx="5" fill="#14181e" stroke="#39434f" stroke-width="1.5"/>
-      <text x="473" y="39" fill="#e8eaed">N</text>
-      <text x="457" y="19" font-family="ui-monospace, monospace" font-weight="400" font-size="8" text-anchor="start" fill="#4ade80" opacity=".55">c2</text>
-      <text x="481" y="49" font-family="ui-monospace, monospace" font-weight="400" font-size="8" text-anchor="start" fill="#e8eaed" opacity=".3">aa</text>
-    </g>
+    <!-- TRAIN: white cells -->
+    <rect x="252" y="8" width="42" height="44" rx="5" fill="#eef1f4" stroke="#c9d4e0" stroke-width="1.5"/><text x="273" y="39" fill="#14181e">T</text>
+    <rect x="302" y="8" width="42" height="44" rx="5" fill="#eef1f4" stroke="#c9d4e0" stroke-width="1.5"/><text x="323" y="39" fill="#14181e">R</text>
+    <rect x="352" y="8" width="42" height="44" rx="5" fill="#eef1f4" stroke="#c9d4e0" stroke-width="1.5"/><text x="373" y="39" fill="#14181e">A</text>
+    <rect x="402" y="8" width="42" height="44" rx="5" fill="#eef1f4" stroke="#c9d4e0" stroke-width="1.5"/><text x="423" y="39" fill="#14181e">I</text>
+    <rect x="452" y="8" width="42" height="44" rx="5" fill="#eef1f4" stroke="#c9d4e0" stroke-width="1.5"/><text x="473" y="39" fill="#14181e">N</text>
   </g>
-  <!-- engine: verify-green chevron -->
-  <polygon points="504,8 530,30 504,52" fill="#4ade80"/>
+  <!-- engine chevron (blue) -->
+  <polygon points="504,8 530,30 504,52" fill="#3f7fd0"/>
 </svg>
