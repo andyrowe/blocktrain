@@ -109,10 +109,14 @@ sidecar `context/<hash>.{bin,enc}` (encrypted if `--encrypt-to`). CLI: `append -
 committed hash. **Proven:** live commit verifies ✓; a tampered/backfilled snapshot → ✗ MISMATCH;
 3 unit tests. Honest limit: proves what the agent *claims* it knew, not that context caused the action.
 
-## Phase 7 — Shared verifiable room (product direction)
-A joint log between two contracting parties: one scope, encrypted to both, both
-BRC-77-signing the anchored root at milestones. Zero sCrypt. **Proof:** two keys jointly
-prove a shared record neither can tamper. This is the candidate headline product.
+## Phase 7 — Shared verifiable room (SPEC'd 2026-09-02 · `docs/SHARED-ROOM.md`)
+A joint log between counterparties: room manifest (participants pinned at open) + entries
+encrypted to all (P5) + **mutually-signed checkpoints** anchored on-chain. Key design call
+(corrects the old "BRC-77" note): checkpoint sigs are **publicly-verifiable ECDSA** (`@bsv/sdk`
+`priv.sign`/`pub.verify`, confirmed) so a neutral arbiter can verify with only pubkeys — BRC-77
+SignedMessage is recipient-verified and can't be. v1 = single-writer + counterparty co-signs
+checkpoints. Reuses chain/anchor/refs/encryption/context; new = manifest + checkpoints + sigs.
+**NOT built — gated on naming one real two-party use case first** (spec §7).
 
 ## Phase 8 — Hosted service + full landing
 When P4–P7 are proven, blocktrain.org moves to its own box: a blind-anchor API + branded
