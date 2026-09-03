@@ -24,4 +24,4 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           # If your Pages project has a different name, change --project-name below.
-          command: pages project list
+          command: pages deploy site --project-name=sparkling-shadow-3990 --branch=main --commit-dirty=true
