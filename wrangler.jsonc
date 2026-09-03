@@ -1,0 +1,8 @@
+{
+  // Deploy the static site to the existing Cloudflare Worker (static assets) that serves
+  // blocktrain.org. Created via the dashboard "upload assets" flow, which produced a Worker
+  // service (not a Pages project), hence a Workers deploy rather than `pages deploy`.
+  "name": "sparkling-shadow-3990",
+  "compatibility_date": "2025-06-01",
+  "assets": { "directory": "./site" }
+}
