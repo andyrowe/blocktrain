@@ -127,15 +127,18 @@ console.log(`blocktrain bundle: ${entries.length} entries, seal root ${seal.root
 
 // 1) hash-chain
 console.log("1) hash-chain (order + integrity)");
-let prev = null;
+let prev = null, encrypted = 0;
 for (const e of entries) {
-  const eh = entryHashOf(e);
-  if (eh !== e.entryHash) fail(`seq ${e.seq}: entryHash mismatch (body altered)`);
-  const lh = linkHashOf(prev, eh);
-  if (lh !== e.linkHash) fail(`seq ${e.seq}: linkHash mismatch (chain broken)`);
+  // Encrypted entries (payload replaced by an `enc` envelope, no plaintext `data`) can't have
+  // their entryHash recomputed without a key — verify the chain LINKAGE from the stored hash;
+  // content-integrity is a key-holder's check (blocktrain reveal). Plaintext entries are fully checked.
+  const isEnc = e.enc !== undefined && e.data === undefined;
+  if (isEnc) encrypted++;
+  else if (entryHashOf(e) !== e.entryHash) fail(`seq ${e.seq}: entryHash mismatch (body altered)`);
+  if (linkHashOf(prev, e.entryHash) !== e.linkHash) fail(`seq ${e.seq}: linkHash mismatch (chain broken)`);
   prev = e.linkHash;
 }
-if (ok) pass(`${entries.length} entries chain cleanly; tip ${prev.slice(0, 16)}…`);
+if (ok) pass(`${entries.length} entries chain cleanly${encrypted ? ` (${encrypted} encrypted — content needs a key)` : ""}; tip ${prev.slice(0, 16)}…`);
 
 // 2) Merkle inclusion against the sealed root
 console.log("2) Merkle inclusion proofs (recomputed locally)");
