@@ -21,6 +21,26 @@ import { readFileSync } from "node:fs";
 const sha256 = (buf) => createHash("sha256").update(buf).digest();
 const GENESIS = Buffer.alloc(32, 0);
 
+// --- safe outbound fetch for bundle-supplied `url` refs ------------------------------
+// A bundle is untrusted input. Refuse loopback/private hosts (SSRF), block redirects,
+// time out, and cap size — so verifying a hostile bundle can't hit internal services,
+// follow a redirect into one, hang, or OOM the machine running this script.
+const MAX_REF_BYTES = 5 * 1024 * 1024;
+function assertSafeUrl(u) {
+  const url = new URL(u);
+  if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("only http(s) URLs allowed");
+  const h = url.hostname.toLowerCase().replace(/^\[|\]$/g, ""); // strip IPv6 brackets
+  if (
+    h === "localhost" || h === "0.0.0.0" || h === "::1" || h.endsWith(".local") ||
+    /^127\./.test(h) || /^10\./.test(h) || /^192\.168\./.test(h) || /^169\.254\./.test(h) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(h) || /^(fc|fd|fe80)/i.test(h)
+  ) throw new Error(`refusing to fetch private/loopback host ${h}`);
+}
+function safeFetch(u, init = {}) {
+  assertSafeUrl(u);
+  return fetch(u, { redirect: "error", signal: AbortSignal.timeout(8000), ...init });
+}
+
 // --- deterministic JSON (sorted keys) — must match how entries were hashed -----------
 function canonical(v) {
   if (v === null) return "null";
@@ -158,12 +178,20 @@ if (allRefs.length) {
         if (!gh.ok) fail(`seq ${seq} git-commit not found`);
       } else if (r.type === "url") {
         if (r.sha256) {
-          const body = new Uint8Array(await (await fetch(r.value)).arrayBuffer());
-          const got = Buffer.from(await import("node:crypto").then((c) => c.createHash("sha256").update(body).digest())).toString("hex");
-          res = got === r.sha256.toLowerCase() ? "content sha256 matches" : "CONTENT MISMATCH";
-          if (got !== r.sha256.toLowerCase()) fail(`seq ${seq} url content mismatch`);
+          const resp = await safeFetch(r.value);
+          const cl = Number(resp.headers.get("content-length") || 0);
+          if (cl > MAX_REF_BYTES) { res = "TOO LARGE"; fail(`seq ${seq} url exceeds ${MAX_REF_BYTES}B`); }
+          else {
+            const body = new Uint8Array(await resp.arrayBuffer());
+            if (body.length > MAX_REF_BYTES) { res = "TOO LARGE"; fail(`seq ${seq} url exceeds ${MAX_REF_BYTES}B`); }
+            else {
+              const got = sha256(Buffer.from(body)).toString("hex");
+              res = got === r.sha256.toLowerCase() ? "content sha256 matches" : "CONTENT MISMATCH";
+              if (got !== r.sha256.toLowerCase()) fail(`seq ${seq} url content mismatch`);
+            }
+          }
         } else {
-          const ok2 = (await fetch(r.value, { method: "HEAD" })).ok;
+          const ok2 = (await safeFetch(r.value, { method: "HEAD" })).ok;
           res = ok2 ? "live" : "DEAD";
           if (!ok2) fail(`seq ${seq} url dead`);
         }

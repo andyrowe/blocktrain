@@ -200,6 +200,14 @@ async function main() {
       process.exit(0); // always succeed
     }
 
+    case "reconcile": {
+      // Fold any contention-spilled events (data/log.jsonl.pending.jsonl) into the chain.
+      const { reconcile } = await import("../src/hook.ts");
+      const n = reconcile(LOG);
+      console.log(`reconciled ${n} pending ${n === 1 ? "entry" : "entries"}`);
+      break;
+    }
+
     case "status": {
       const log = readLog(LOG);
       const sf = readSeals(SEALS);

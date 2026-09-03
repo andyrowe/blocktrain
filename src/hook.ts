@@ -12,7 +12,7 @@
 // Reads (Read/Grep/Glob/search/fetch) are ignored — noise + privacy.
 
 import { createHash, randomBytes } from "node:crypto";
-import { openSync, closeSync, unlinkSync, appendFileSync, statSync } from "node:fs";
+import { openSync, closeSync, unlinkSync, appendFileSync, statSync, existsSync, readFileSync } from "node:fs";
 import { canonicalize } from "./canonical.ts";
 import { readLog, type LogEntry } from "./store.ts";
 import { appendEntry } from "./chain.ts";
@@ -111,65 +111,111 @@ export function classify(ev: ToolEvent): Classified {
   return null; // everything else (Read/Grep/Glob/web_*/memory_*/status) = not an outward action
 }
 
-// Locked append so concurrent PostToolUse hooks can't corrupt the hash-chain.
-function withLock<T>(lockPath: string, fn: () => T): T {
+// Try to grab the append lock (O_EXCL), stealing one left stale by a crashed hook.
+// Returns the fd, or null if it stays contended past the retry budget (~1.5s).
+function acquireLock(lockPath: string): number | null {
   const STALE_MS = 5000; // a hook run is <2s; a lock older than this was left by a crash
-  let fd: number | null = null;
   for (let i = 0; i < 100; i++) {
     try {
-      fd = openSync(lockPath, "wx"); // O_EXCL: fails if lock exists
-      break;
+      return openSync(lockPath, "wx");
     } catch {
-      // Break a stale lock left by a crashed/reaped hook, so capture can't wedge forever.
       try {
         if (Date.now() - statSync(lockPath).mtimeMs > STALE_MS) {
           unlinkSync(lockPath);
           continue; // retry immediately
         }
       } catch { /* lock vanished between open and stat — just retry */ }
-      const until = Date.now() + 15; // busy-wait a few ms (hooks are short-lived processes)
+      const until = Date.now() + 15;
       while (Date.now() < until) { /* spin */ }
     }
   }
-  if (fd === null) throw new Error("could not acquire log lock");
-  try {
-    return fn();
-  } finally {
-    try { closeSync(fd); } catch { /* ignore */ }
-    try { unlinkSync(lockPath); } catch { /* ignore */ }
+  return null;
+}
+function releaseLock(fd: number, lockPath: string): void {
+  try { closeSync(fd); } catch { /* ignore */ }
+  try { unlinkSync(lockPath); } catch { /* ignore */ }
+}
+
+type SpillRecord = { actor: string; kind: string; data: ReturnType<typeof buildData> };
+function buildData(ev: ToolEvent, c: { kind: string; data: Record<string, unknown> }) {
+  const nonce = randomBytes(16).toString("hex");
+  return {
+    ...c.data,
+    evidence: "mechanical",
+    capturedBy: "harness-hook",
+    tool: ev.tool_name,
+    nonce,
+    payloadHash: sha256hex(nonce + canonicalize(ev.tool_input ?? {})),
+  };
+}
+
+// Fold any spilled-under-contention events (FIFO) into the chain. Called while holding the
+// lock, before the new append. Spilled events keep their own order; only their interleaving
+// with concurrently-locked events is approximate — acceptable, and never lost.
+function drainPending(logPath: string): LogEntry[] {
+  const pend = logPath + ".pending.jsonl";
+  if (!existsSync(pend)) return readLog(logPath);
+  const lines = readFileSync(pend, "utf8").split("\n").filter((l) => l.trim());
+  const log = readLog(logPath);
+  for (const line of lines) {
+    try {
+      const rec = JSON.parse(line) as { actor: string; kind: string; data: unknown };
+      const entry = appendEntry(log, rec);
+      appendFileSync(logPath, JSON.stringify(entry) + "\n", "utf8");
+      log.push(entry);
+    } catch { /* skip a corrupt pending line */ }
   }
+  try { unlinkSync(pend); } catch { /* ignore */ }
+  return log;
 }
 
 // Ingest one tool-event JSON string and append a redacted entry if it's captureable.
-// Returns the appended entry (for tests) or null when skipped. NEVER throws.
+// Returns the appended entry (for tests) or null when skipped/spilled. NEVER throws,
+// and NEVER silently loses a captureable event (falls back to a pending spill).
 export function runHook(stdinStr: string, logPath: string, actor = "mike"): LogEntry | null {
+  let record: SpillRecord | null = null;
   try {
     const ev = JSON.parse(stdinStr) as ToolEvent;
     const c = classify(ev);
     if (!c) return null;
-
-    const nonce = randomBytes(16).toString("hex");
-    const payloadHash = sha256hex(nonce + canonicalize(ev.tool_input ?? {}));
-    const data = {
-      ...c.data,
-      evidence: "mechanical",
-      capturedBy: "harness-hook",
-      tool: ev.tool_name,
-      nonce,
-      payloadHash, // commits to the full tool input privately; raw content is NOT stored
-    };
+    record = { actor, kind: c.kind, data: buildData(ev, c) };
 
     const lockPath = logPath + ".lock";
-    return withLock(lockPath, () => {
-      const log = readLog(logPath);
-      const entry = appendEntry(log, { actor, kind: c.kind, data });
+    const fd = acquireLock(lockPath);
+    if (fd === null) {
+      // Couldn't lock in time — spill (atomic single-line append). Reconciled on next lock.
+      appendFileSync(logPath + ".pending.jsonl", JSON.stringify(record) + "\n", "utf8");
+      return null;
+    }
+    try {
+      const log = drainPending(logPath);
+      const entry = appendEntry(log, record);
       appendFileSync(logPath, JSON.stringify(entry) + "\n", "utf8");
       return entry;
-    });
+    } finally {
+      releaseLock(fd, lockPath);
+    }
   } catch (e) {
+    // Last resort: if we already built the record, spill it rather than lose it.
     try {
+      if (record) appendFileSync(logPath + ".pending.jsonl", JSON.stringify(record) + "\n", "utf8");
       appendFileSync(logPath + ".hook-errors", `${new Date().toISOString()} ${String(e)}\n`, "utf8");
     } catch { /* ignore */ }
     return null;
+  }
+}
+
+// Manually fold any pending (contention-spilled) events into the chain. Belt-and-suspenders
+// for the `blocktrain reconcile` CLI verb; the hook also drains automatically on each append.
+export function reconcile(logPath: string): number {
+  const before = readLog(logPath).length;
+  const lockPath = logPath + ".lock";
+  const fd = acquireLock(lockPath);
+  if (fd === null) return 0;
+  try {
+    const after = drainPending(logPath).length;
+    return after - before;
+  } finally {
+    releaseLock(fd, lockPath);
   }
 }

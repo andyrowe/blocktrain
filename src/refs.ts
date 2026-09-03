@@ -14,10 +14,28 @@ export type Ref =
 export type RefResult = { ref: Ref; ok: boolean; detail: string };
 
 const WOC = "https://api.whatsonchain.com/v1/bsv/main";
+const MAX_REF_BYTES = 5 * 1024 * 1024;
 
 async function sha256Hex(buf: ArrayBuffer): Promise<string> {
   const d = await crypto.subtle.digest("SHA-256", buf);
   return Buffer.from(new Uint8Array(d)).toString("hex");
+}
+
+// `url` refs come from untrusted entry data. Block loopback/private hosts (SSRF), refuse
+// redirects, time out, and cap size before hashing.
+function assertSafeUrl(u: string): void {
+  const url = new URL(u);
+  if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("only http(s) URLs allowed");
+  const h = url.hostname.toLowerCase().replace(/^\[|\]$/g, ""); // strip IPv6 brackets
+  if (
+    h === "localhost" || h === "0.0.0.0" || h === "::1" || h.endsWith(".local") ||
+    /^127\./.test(h) || /^10\./.test(h) || /^192\.168\./.test(h) || /^169\.254\./.test(h) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(h) || /^(fc|fd|fe80)/i.test(h)
+  ) throw new Error(`refusing to fetch private/loopback host ${h}`);
+}
+function safeFetch(u: string, init: RequestInit = {}): Promise<Response> {
+  assertSafeUrl(u);
+  return fetch(u, { redirect: "error", signal: AbortSignal.timeout(8000), ...init });
 }
 
 // Verify a single ref against its external source of truth. Trusts only the named public
@@ -41,14 +59,19 @@ export async function verifyRef(ref: Ref): Promise<RefResult> {
     }
     if (ref.type === "url") {
       if (ref.sha256) {
-        const r = await fetch(ref.value);
+        const r = await safeFetch(ref.value);
         if (!r.ok) return { ref, ok: false, detail: `HTTP ${r.status}` };
-        const got = await sha256Hex(await r.arrayBuffer());
+        if (Number(r.headers.get("content-length") || 0) > MAX_REF_BYTES) {
+          return { ref, ok: false, detail: `too large (> ${MAX_REF_BYTES}B)` };
+        }
+        const bytes = await r.arrayBuffer();
+        if (bytes.byteLength > MAX_REF_BYTES) return { ref, ok: false, detail: `too large (> ${MAX_REF_BYTES}B)` };
+        const got = await sha256Hex(bytes);
         return got.toLowerCase() === ref.sha256.toLowerCase()
           ? { ref, ok: true, detail: "content sha256 matches" }
           : { ref, ok: false, detail: `content sha256 mismatch (${got.slice(0, 12)}…)` };
       }
-      const r = await fetch(ref.value, { method: "HEAD" });
+      const r = await safeFetch(ref.value, { method: "HEAD" });
       return r.ok
         ? { ref, ok: true, detail: `live (HTTP ${r.status})` }
         : { ref, ok: false, detail: `HTTP ${r.status}` };
