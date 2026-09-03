@@ -72,7 +72,7 @@ export function appendEntry(log: LogEntry[], input: EventInput): LogEntry {
 }
 
 export type VerifyResult =
-  | { ok: true; count: number; tip: string | null }
+  | { ok: true; count: number; tip: string | null; encrypted: number }
   | { ok: false; failedSeq: number; reason: string };
 
 // Replay the chain from raw events and confirm every entryHash + linkHash. This is
@@ -80,13 +80,20 @@ export type VerifyResult =
 // (timestamp) is checked separately against bsv.cx / SPV.
 export function verifyChain(log: LogEntry[]): VerifyResult {
   let prevLink: string | null = null;
+  let encrypted = 0;
   for (let i = 0; i < log.length; i++) {
     const e = log[i];
     if (e.seq !== i) {
       return { ok: false, failedSeq: i, reason: `seq mismatch: expected ${i}, got ${e.seq}` };
     }
-    const expectEntry = computeEntryHash(e);
-    if (expectEntry !== e.entryHash) {
+    // Encrypted entries (payload replaced by an `enc` envelope, no plaintext `data`) can't have
+    // their entryHash recomputed without a key — we verify the chain LINKAGE from the stored
+    // entryHash, and defer content-integrity to a key-holder (see `reveal`). Plaintext entries
+    // are fully checked here.
+    const isEncrypted = (e as { enc?: unknown }).enc !== undefined && e.data === undefined;
+    if (isEncrypted) {
+      encrypted++;
+    } else if (computeEntryHash(e) !== e.entryHash) {
       return { ok: false, failedSeq: i, reason: "entryHash mismatch (event body was altered)" };
     }
     const expectLink = computeLinkHash(prevLink, e.entryHash);
@@ -95,5 +102,5 @@ export function verifyChain(log: LogEntry[]): VerifyResult {
     }
     prevLink = e.linkHash;
   }
-  return { ok: true, count: log.length, tip: prevLink };
+  return { ok: true, count: log.length, tip: prevLink, encrypted };
 }

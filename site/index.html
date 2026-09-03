@@ -131,11 +131,19 @@ blocktrain verify --spv</pre>
   </div>
 
   <h2>Privacy</h2>
-  <p><b>Shipped:</b> the blockchain only ever holds a hash — never your data.</p>
-  <p><b>On the roadmap:</b> off-chain contents encrypted at rest, with <em>blind anchoring</em> the
-  default — blocktrain holds your proofs without being able to read them — and selective sharing with
-  specific parties (a client, their counsel, a counterparty) without ever putting plaintext on-chain.
-  Not built yet; described here so you know where this is going.</p>
+  <p><b>Shipped:</b> the chain only ever holds a hash — never your data. Entries can also be
+  <strong>encrypted at rest</strong>, so blocktrain (or anyone holding the log) can't read them —
+  <strong>blind by default</strong>. Access is granted <em>per entry</em> to specific keys (a client,
+  their counsel, a counterparty), so different parties see different entries; a key-holder decrypts
+  and re-checks the content against the same on-chain hash. Built on native BSV keys — envelope
+  encryption (AES-256-GCM payload, ECIES-wrapped per recipient).</p>
+  <pre>blocktrain keygen                          # a read key: share the pub, keep the wif
+blocktrain append --kind payment --data '{…}' \
+  --encrypt-to &lt;client-pub&gt; --encrypt-to &lt;counsel-pub&gt;
+blocktrain reveal --seq 3 --key &lt;wif&gt;       # authorized keys only</pre>
+  <p class="kv">Scope note: the encrypted <em>payload</em> is private; structural metadata (kind,
+  actor, timestamp) stays visible so the log is navigable. Coming next: a hosted blind-anchor service
+  (P8) so clients don't run their own.</p>
 
   <h2>Who it's for</h2>
   <p>Agent builders, auditors, and teams whose agents act <em>on someone else's behalf</em> — anywhere

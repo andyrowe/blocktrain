@@ -61,8 +61,19 @@ async function main() {
       };
       const log = readLog(LOG);
       const entry = appendEntry(log, { actor, kind, data: enriched });
-      appendLog(LOG, entry);
-      console.log(`appended seq=${entry.seq} kind=${kind} evidence=${evidence}${refs.length ? ` refs=${refs.length}` : ""}`);
+      // P5: --encrypt-to <pub> (repeatable) stores the payload as an encrypted envelope
+      // instead of plaintext. The hashes still commit the plaintext, so the chain/anchor are
+      // unchanged and a key-holder can later prove the ciphertext matches (see `reveal`).
+      const encTo = argsAll("--encrypt-to");
+      let stored: Record<string, unknown> = entry;
+      if (encTo.length) {
+        const { encryptFor } = await import("../src/crypto.ts");
+        const { canonicalize: canon } = await import("../src/canonical.ts");
+        const env = encryptFor(Buffer.from(canon(entry.data), "utf8"), encTo);
+        stored = { seq: entry.seq, ts: entry.ts, actor: entry.actor, kind: entry.kind, enc: env, entryHash: entry.entryHash, linkHash: entry.linkHash };
+      }
+      appendLog(LOG, stored as never);
+      console.log(`appended seq=${entry.seq} kind=${kind} evidence=${evidence}${refs.length ? ` refs=${refs.length}` : ""}${encTo.length ? ` encrypted→${encTo.length} recipient(s)` : ""}`);
       console.log(`  entryHash ${entry.entryHash}`);
       console.log(`  linkHash  ${entry.linkHash}`);
       break;
@@ -123,7 +134,7 @@ async function main() {
         console.error(`CHAIN BROKEN at seq ${chain.failedSeq}: ${chain.reason}`);
         process.exit(1);
       }
-      console.log(`chain ok: ${chain.count} entries, tip ${chain.tip ?? "(empty)"}`);
+      console.log(`chain ok: ${chain.count} entries, tip ${chain.tip ?? "(empty)"}${chain.encrypted ? ` (${chain.encrypted} encrypted — content needs a key; run reveal)` : ""}`);
 
       const sf = readSeals(SEALS);
       let anchorsOk = 0;
@@ -198,6 +209,43 @@ async function main() {
         console.error(`[blocktrain hook] captured seq=${entry.seq} ${entry.kind}`);
       }
       process.exit(0); // always succeed
+    }
+
+    case "keygen": {
+      const { generateIdentity } = await import("../src/crypto.ts");
+      const id = generateIdentity();
+      console.log(`pub (share this to grant read access):\n  ${id.pub}`);
+      console.log(`wif (KEEP SECRET — this is the read key):\n  ${id.wif}`);
+      break;
+    }
+
+    case "reveal": {
+      const seq = Number(arg("--seq"));
+      const wif = arg("--key");
+      if (!wif || Number.isNaN(seq)) throw new Error("reveal: --seq <n> --key <wif> required");
+      const log = readLog(LOG);
+      const e = log[seq] as { seq: number; ts: string; actor: string; kind: string; data?: unknown; enc?: unknown; entryHash: string };
+      if (!e) throw new Error(`no entry at seq ${seq}`);
+      if (!e.enc) {
+        console.log(`seq ${seq} is not encrypted; data: ${JSON.stringify(e.data)}`);
+        break;
+      }
+      const { decryptWith } = await import("../src/crypto.ts");
+      const { computeEntryHash } = await import("../src/chain.ts");
+      let data: unknown;
+      try {
+        data = JSON.parse(decryptWith(e.enc as never, wif).toString("utf8"));
+      } catch (err) {
+        console.error(`cannot decrypt seq ${seq}: ${(err as Error).message}`);
+        process.exit(1);
+      }
+      const recomputed = computeEntryHash({ seq: e.seq, ts: e.ts, actor: e.actor, kind: e.kind, data });
+      const good = recomputed === e.entryHash;
+      console.log(`seq ${seq} kind=${e.kind}`);
+      console.log(`  decrypted: ${JSON.stringify(data)}`);
+      console.log(`  content integrity: ${good ? "✓ matches the committed on-chain hash" : "✗ MISMATCH"}`);
+      if (!good) process.exit(1);
+      break;
     }
 
     case "reconcile": {

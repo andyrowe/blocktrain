@@ -7,7 +7,7 @@
     "blocktrain": "bin/blocktrain.ts"
   },
   "scripts": {
-    "test": "node test/merkle.test.ts && node test/chain.test.ts && node test/hook.test.ts && node test/refs.test.ts && node test/pay.test.ts && node test/hooklock.test.ts && node test/refsguard.test.ts",
+    "test": "node test/merkle.test.ts && node test/chain.test.ts && node test/hook.test.ts && node test/refs.test.ts && node test/pay.test.ts && node test/hooklock.test.ts && node test/refsguard.test.ts && node test/crypto.test.ts",
     "cli": "node bin/blocktrain.ts"
   },
   "engines": {

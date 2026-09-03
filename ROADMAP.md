@@ -89,12 +89,17 @@ TAAL, Mempool, SVPool, neutral for unknown/solo; a signature color if Andy's own
 Data-bound + verifiable (colors derive from public coinbase data). Goes on the verify page.
 **Proof:** our two anchors render correctly — batch #1 = GorillaPool-yellow (block 964785).
 
-## Phase 5 — Privacy: encryption + blind anchoring
-Payload + context stored encrypted; chain stays hash-only; blocktrain blind by default.
-**Deliverable:** `@bsv/sdk` BRC-2/42/43 encrypt-to-key; per-entry nonce; envelope
-encryption with per-recipient key-wrapping (client + a "lawyer" + a "counterparty" key).
-**Proof:** ciphertext at rest that blocktrain can't read; an authorized key decrypts →
-recomputes hash → confirms inclusion; a second key sees only its scope.
+## Phase 5 — Privacy: encryption + blind anchoring ✅ DONE (2026-09-02)
+`src/crypto.ts`: envelope encryption on native BSV keys — random AES-256-GCM CEK per entry,
+CEK ECIES-wrapped (`@bsv/sdk` `SymmetricKey` + `ECIES.electrumEncrypt`) to each recipient
+pubkey. CLI: `keygen`, `append --encrypt-to <pub>` (repeatable), `reveal --seq --key`.
+`verifyChain` verifies encrypted entries structurally (linkage from stored hashes) and defers
+content-integrity to a key-holder (`reveal` recomputes the committed hash after decrypt).
+- **Proven (12 tests + live CLI):** raw log leaks no plaintext (blind); authorized keys decrypt,
+  a non-recipient is refused; per-entry scoping (counterparty reads shared, refused the payment);
+  GCM tamper detection; hash round-trips after decrypt.
+- **Scope:** payload encrypted; structural metadata (kind/actor/ts) stays visible. Hosted
+  blind-anchor service is still P8.
 
 ## Phase 6 — Context anchoring
 Each action also commits `contextHash` = `sha256(nonce ‖ model-input snapshot)` at
