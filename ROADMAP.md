@@ -124,10 +124,15 @@ Claude Code; Hermes via a bridge) uses one door: tools `blocktrain_append/seal/v
 status/keygen`. CLI + MCP share `src/core.ts` (single implementation, no drift). Proven via a
 real MCP client smoke test. This is the framework-agnostic integration layer under P8.
 
-## Phase 8 — Hosted service + full landing
-When P4–P7 are proven, blocktrain.org moves to its own box: a blind-anchor API + branded
-verification pages. Own trust domain, own float, own keys. **Proof:** a client integrates
-against the hosted API and verifies independently.
+## Phase 8 — Hosted service: remote MCP on Cloudflare Workers (SPEC'd 2026-09-02 · `docs/HOSTED-MCP.md`)
+Host blocktrain's MCP as a **remote MCP** at `mcp.blocktrain.org/mcp` (CF Agents SDK
+`createMcpHandler`, Streamable HTTP, Workers OAuth). Clients connect by URL — no CLI, no wallet.
+Key work: abstract `store.ts` behind a `Store` interface (fs for CLI, R2+Durable-Object for the
+Worker); server holds the anchoring float; **blind by default** (clients encrypt first → service
+stores ciphertext+hashes, can't read). Integrity/timestamp stay chain-verified (service never
+trusted for those); it's only trusted for liveness, and everything stays exportable/verifiable off
+it. Also: `blocktrain.org/llms.txt` shipped (agent-discoverable). **NOT built — gated on real
+hosted demand** (a client who won't run the CLI/hold a wallet).
 
 ---
 

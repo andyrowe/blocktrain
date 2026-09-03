@@ -1,0 +1,24 @@
+# blocktrain
+
+> Verifiable agent memory: a hash-chained, on-chain-anchored (BSV via bsv.cx) log of what an AI agent did — tamper-evident, ordered, timestamped, and verifiable by anyone trusting no one (including blocktrain). Entries can be encrypted per-recipient (blind by default). Usable as a CLI or an MCP server.
+
+blocktrain turns an agent's action log into a record that is tamper-evident, ordered, timestamped, and portable. Each entry is hash-chained; batches are anchored on the BSV blockchain via bsv.cx (RFC 6962 Merkle root in an OP_RETURN). Anyone can verify integrity + order + timestamp against the public chain — with no access to the operator's database, and even if blocktrain disappears. Entries can be encrypted so only chosen keys read them (a client, their counsel, a counterparty); the chain only ever holds a hash, so anchoring stays blind.
+
+Honest scope: blocktrain proves the integrity, order, and timestamp of a SELF-REPORTED log. It makes after-the-fact tampering detectable; it does NOT make the agent truthful to its own log. Context anchoring narrows this (the decision-time context is committed at action-time, so it can't be backfilled), but does not prove the context caused the action.
+
+## Verify it yourself (trust no one)
+- [Standalone verifier](https://blocktrain.org/verify.mjs): a single zero-dependency Node script. Recomputes the hash-chain, folds each Merkle inclusion proof, reads the anchor tx's OP_RETURN straight off WhatsOnChain, and corroborates external refs. Contacts neither blocktrain nor bsv.cx.
+- [Public proof bundle](https://blocktrain.org/blocktrain-poc.json): a real batch anchored on mainnet. Run: `node verify.mjs blocktrain-poc.json` — expect `VERIFIED`.
+
+## Use it
+- [Source + README (Apache-2.0)](https://github.com/andyrowe/blocktrain): CLI and MCP server.
+- CLI verbs: `append`, `seal`, `verify`, `reveal`, `keygen`, `context`, `status`.
+- MCP server (`bin/blocktrain-mcp.ts`, stdio): tools `blocktrain_append`, `blocktrain_seal`, `blocktrain_verify`, `blocktrain_reveal`, `blocktrain_status`, `blocktrain_keygen`. Add it to any MCP client (Claude Code, OpenClaw, …).
+
+## Docs
+- [DESIGN — rationale, fidelity ladder, privacy model](https://github.com/andyrowe/blocktrain/blob/master/DESIGN.md)
+- [ROADMAP — what's shipped vs next](https://github.com/andyrowe/blocktrain/blob/master/ROADMAP.md)
+- [Shared verifiable room (spec)](https://github.com/andyrowe/blocktrain/blob/master/docs/SHARED-ROOM.md)
+
+## Built on
+- [bsv.cx](https://bsv.cx): on-chain anchoring — Merkle-batched timestamps (`not2`), free trustless `/spv/verify`.
