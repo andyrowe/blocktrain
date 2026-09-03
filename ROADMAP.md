@@ -11,8 +11,8 @@ Spend key: 💸 = spends BSV float (tiny, one tx per seal); everything else is f
 **Working PoC shipped and public.** Site live at **blocktrain.org** (Cloudflare Pages),
 public repo **github.com/andyrowe/blocktrain** (Apache-2.0). Done: P0–P4 + brand. The site
 shows three real corroborated actions anyone can verify trusting no one.
-**Open items:** (a) CF auto-deploy — needs 2 GitHub secrets (`CLOUDFLARE_API_TOKEN`,
-`CLOUDFLARE_ACCOUNT_ID`) + Pages project name to confirm, then no more manual zips;
+**Open items:** (a) ✅ CF auto-deploy LIVE — GitHub Actions → `wrangler deploy` to the
+Worker `sparkling-shadow-3990` on every `site/**` push (proven end-to-end 2026-09-02);
 (b) next build = live miner-train viz (P4.6); (c) strategic = name a real cross-party payer
 + add a "who it's for / contact" path before pouring weeks into P5; (d) runnable-quickstart
 fix from the cold read (the `blocktrain` CLI needs `npm link`/`node bin/...`, and `seal` needs
