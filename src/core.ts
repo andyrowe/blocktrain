@@ -84,7 +84,8 @@ export async function verifyLog(paths: Paths, opts: { refs?: boolean; onchain?: 
     }
     let onchain: string | undefined;
     if (opts.onchain && s.txid && s.txid !== "DRY") {
-      onchain = (await anchorCarriesRoot(s.txid, s.root, s.network === "test" ? "test" : "main")) ? "root-confirmed" : "ROOT-NOT-FOUND";
+      const c = await anchorCarriesRoot(s.txid, s.root, s.network === "test" ? "test" : "main");
+      onchain = c.confirmed ? `root-confirmed (${c.sources.join("+")})` : "ROOT-NOT-FOUND";
     }
     seals.push({ fromSeq: s.fromSeq, toSeq: s.toSeq, root: s.root, txid: s.txid, onchain });
   }

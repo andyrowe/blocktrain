@@ -44,10 +44,10 @@ export async function verifyRef(ref: Ref): Promise<RefResult> {
   try {
     if (ref.type === "bsv-txid") {
       if (!/^[0-9a-f]{64}$/i.test(ref.value)) return { ref, ok: false, detail: "not a 64-hex txid" };
-      const r = await fetch(`${WOC}/tx/hash/${ref.value}`);
-      if (!r.ok) return { ref, ok: false, detail: `WhatsOnChain ${r.status}` };
-      const j = (await r.json()) as { blockheight?: number; confirmations?: number };
-      return { ref, ok: true, detail: `on-chain, block ${j.blockheight ?? "?"} (${j.confirmations ?? 0} conf)` };
+      const { txExists } = await import("./client.ts"); // explorer-agnostic (multi-source)
+      return (await txExists(ref.value, "main"))
+        ? { ref, ok: true, detail: "on-chain" }
+        : { ref, ok: false, detail: "not found on any explorer" };
     }
     if (ref.type === "git-commit") {
       const r = await fetch(`https://api.github.com/repos/${ref.repo}/commits/${ref.value}`, {

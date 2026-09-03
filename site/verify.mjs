@@ -88,13 +88,30 @@ function foldProof(leafData, path) {
   return acc.toString("hex");
 }
 
-// --- read the anchor tx OP_RETURN off the public chain -------------------------------
-async function opReturnChunks(txid, net) {
-  const base = `https://api.whatsonchain.com/v1/bsv/${net === "test" ? "test" : "main"}`;
-  const hex = (await (await fetch(`${base}/tx/${txid}/hex`)).text()).trim();
-  if (!/^[0-9a-f]+$/i.test(hex)) throw new Error("could not fetch anchor tx hex");
-  // minimal tx parse: locate outputs and scan each script for OP_RETURN pushdata
-  // (we scan the whole raw tx for the 006a marker; robust enough for a data output)
+// --- explorer-agnostic on-chain reads ------------------------------------------------
+// Never trust one explorer: read the tx from several independent sources and require them to
+// agree on the bytes. Override with your own node via BLOCKTRAIN_EXPLORER=<WoC-compatible base>.
+function explorerUrls(txid, net) {
+  const custom = (typeof process !== "undefined" && process.env && process.env.BLOCKTRAIN_EXPLORER) || "";
+  if (custom) return [{ name: "custom", url: `${custom.replace(/\/$/, "")}/tx/${txid}/hex` }];
+  const n = net === "test" ? "test" : "main";
+  const urls = [{ name: "whatsonchain", url: `https://api.whatsonchain.com/v1/bsv/${n}/tx/${txid}/hex` }];
+  if (n === "main") urls.push({ name: "bitails", url: `https://api.bitails.io/download/tx/${txid}/hex` });
+  return urls;
+}
+// Returns { hexes: [{name,hex}], agree: bool } — agree=true iff all responders returned the same bytes.
+async function fetchTxHexMulti(txid, net) {
+  const hexes = [];
+  for (const e of explorerUrls(txid, net)) {
+    try {
+      const t = (await fetch(e.url)).ok ? (await (await fetch(e.url)).text()).trim() : "";
+      if (/^[0-9a-f]+$/i.test(t)) hexes.push({ name: e.name, hex: t });
+    } catch { /* try next */ }
+  }
+  const agree = new Set(hexes.map((h) => h.hex)).size <= 1;
+  return { hexes, agree };
+}
+function parseOpReturns(hex) {
   const buf = Buffer.from(hex, "hex");
   const results = [];
   for (let i = 0; i < buf.length - 1; i++) {
@@ -152,14 +169,19 @@ for (let i = 0; i < leafBufs.length; i++) {
 }
 if (ok) pass(`all ${leafBufs.length} leaves fold to root ${seal.root.slice(0, 16)}…`);
 
-// 3) on-chain anchor
-console.log("3) on-chain anchor (public BSV chain via WhatsOnChain)");
+// 3) on-chain anchor — cross-checked across independent explorers (trust no single one)
+console.log("3) on-chain anchor (public BSV chain, cross-checked across explorers)");
 try {
-  const found = (await opReturnChunks(seal.txid, seal.network)).find(
-    (c) => c[0] === "bsv.cx" && c[1] === "not2" && (c[2] || "").toLowerCase() === seal.root.toLowerCase(),
-  );
-  if (found) pass(`tx ${seal.txid.slice(0, 16)}… OP_RETURN = ["bsv.cx","not2","${seal.root.slice(0, 12)}…"]`);
-  else fail("anchor tx OP_RETURN does not carry this root");
+  const { hexes, agree } = await fetchTxHexMulti(seal.txid, seal.network);
+  if (!hexes.length) fail("could not read the anchor tx from any explorer");
+  else if (!agree) fail("explorers disagree on the anchor tx bytes — refusing to trust");
+  else {
+    const found = parseOpReturns(hexes[0].hex).find(
+      (c) => c[0] === "bsv.cx" && c[1] === "not2" && (c[2] || "").toLowerCase() === seal.root.toLowerCase(),
+    );
+    if (found) pass(`tx ${seal.txid.slice(0, 16)}… OP_RETURN = ["bsv.cx","not2","${seal.root.slice(0, 12)}…"] — confirmed by ${hexes.map((h) => h.name).join(" + ")}`);
+    else fail("anchor tx OP_RETURN does not carry this root");
+  }
 } catch (e) {
   fail("chain read failed: " + e.message);
 }
@@ -172,7 +194,7 @@ if (allRefs.length) {
     try {
       let res;
       if (r.type === "bsv-txid") {
-        const ok2 = (await fetch(`https://api.whatsonchain.com/v1/bsv/main/tx/hash/${r.value}`)).ok;
+        const ok2 = (await fetchTxHexMulti(r.value, "main")).hexes.length > 0;
         res = ok2 ? "on-chain" : "NOT FOUND";
         if (!ok2) fail(`seq ${seq} bsv-txid not found`);
       } else if (r.type === "git-commit") {

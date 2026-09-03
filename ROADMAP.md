@@ -136,6 +136,22 @@ hosted demand** (a client who won't run the CLI/hold a wallet).
 
 ---
 
+## Phase 8.5 — Explorer-agnostic verification ✅ DONE (2026-09-02)
+The on-chain read no longer trusts one explorer. By default the tx is fetched from multiple
+independent sources (WhatsOnChain + Bitails) and they must AGREE on the bytes (disagreement →
+refuse); `BLOCKTRAIN_EXPLORER=<WoC-compatible base>` points at your own node instead. Applied to
+`anchorCarriesRoot`/`txExists` (`src/client.ts`), `refs.ts`, and the standalone `verify.mjs`.
+Output shows the confirming sources (e.g. `root-confirmed (whatsonchain+bitails)`). Removes the
+last trusted third party from verification. Proven live on the real bundle.
+
+## Phase 9 — Full SPV (client-side header verification)
+The trustless end state: verify the anchor via a Merkle-proof-to-block-header path, with the
+client independently holding/syncing block headers (from the P2P network / multiple sources),
+so verification trusts only the longest header chain — not any explorer at all. bsv.cx already
+emits BEEF/BUMP + runs a headers node (the proof material); the work is client-side header sync +
+proof-to-header checking in the verifier. Gated on demand; multi-explorer (P8.5) covers the
+practical case in the meantime.
+
 ## Critical path & gates
 - **Do now (free):** nothing blocks — P2 hook design can start before P1.
 - **Needs your go (💸):** P1 first anchor. Tiny spend, and it's the live compat proof.

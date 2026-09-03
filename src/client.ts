@@ -63,17 +63,40 @@ export function fetchProof(hash: string, base = DEFAULT_BASE): Promise<BsvcxProo
 
 import { postPaid } from "./pay.ts";
 
-// Ground-truth on-chain check: read the anchor tx from the public chain (WhatsOnChain)
-// and confirm its OP_RETURN encodes `bsv.cx/not2/<root>`. This trusts only the chain and
-// math — not bsv.cx. Returns true iff the committed root is on-chain in that tx.
-export async function anchorCarriesRoot(
-  txid: string,
-  root: string,
-  net: "main" | "test" = "main",
-): Promise<boolean> {
-  const { Transaction } = await import("@bsv/sdk");
-  const hex = (await (await fetch(`https://api.whatsonchain.com/v1/bsv/${net}/tx/${txid}/hex`)).text()).trim();
-  if (!/^[0-9a-f]+$/i.test(hex)) return false;
+// Explorer-agnostic on-chain reads. We never trust a single explorer: by default we read the
+// tx from multiple independent sources and require them to AGREE on the bytes, so one down or
+// lying explorer can't break or fool verification. Override with your OWN node via
+// BLOCKTRAIN_EXPLORER=<WoC-compatible base url> (then that single trusted source is used).
+type Explorer = { name: string; hexUrl: (txid: string, net: "main" | "test") => string | null };
+export function explorers(): Explorer[] {
+  const custom = process.env.BLOCKTRAIN_EXPLORER;
+  if (custom) {
+    const base = custom.replace(/\/$/, "");
+    return [{ name: "custom", hexUrl: (txid, net) => `${base}/tx/${txid}/hex`.replace("{net}", net) }];
+  }
+  return [
+    { name: "whatsonchain", hexUrl: (txid, net) => `https://api.whatsonchain.com/v1/bsv/${net}/tx/${txid}/hex` },
+    { name: "bitails", hexUrl: (txid, net) => (net === "main" ? `https://api.bitails.io/download/tx/${txid}/hex` : null) },
+  ];
+}
+// Fetch the raw tx hex from every configured explorer that has it.
+async function fetchTxHex(txid: string, net: "main" | "test"): Promise<{ name: string; hex: string }[]> {
+  const out: { name: string; hex: string }[] = [];
+  for (const e of explorers()) {
+    const u = e.hexUrl(txid, net);
+    if (!u) continue;
+    try {
+      const t = (await (await fetch(u)).text()).trim();
+      if (/^[0-9a-f]+$/i.test(t) && t.length > 0) out.push({ name: e.name, hex: t });
+    } catch { /* explorer down — try the next */ }
+  }
+  return out;
+}
+// Does the tx exist on-chain (per any explorer)? Used to corroborate bsv-txid refs.
+export async function txExists(txid: string, net: "main" | "test" = "main"): Promise<boolean> {
+  return (await fetchTxHex(txid, net)).length > 0;
+}
+function opReturnCarries(hex: string, root: string, Transaction: typeof import("@bsv/sdk").Transaction): boolean {
   const tx = Transaction.fromHex(hex);
   for (const o of tx.outputs) {
     const script = Buffer.from(o.lockingScript.toHex(), "hex");
@@ -89,11 +112,25 @@ export async function anchorCarriesRoot(
       chunks.push(script.subarray(p, p + len).toString("utf8"));
       p += len;
     }
-    if (chunks[0] === "bsv.cx" && chunks[1] === "not2" && chunks[2]?.toLowerCase() === root.toLowerCase()) {
-      return true;
-    }
+    if (chunks[0] === "bsv.cx" && chunks[1] === "not2" && chunks[2]?.toLowerCase() === root.toLowerCase()) return true;
   }
   return false;
+}
+
+// Confirm the anchor tx carries bsv.cx/not2/<root>, cross-checked across explorers. Trusts only
+// the chain + math. `confirmed` iff ≥1 source carries the root and no two sources disagree on the
+// tx bytes (disagreement = tampering → refuse). `sources` = explorers that returned the tx.
+export async function anchorCarriesRoot(
+  txid: string,
+  root: string,
+  net: "main" | "test" = "main",
+): Promise<{ confirmed: boolean; sources: string[] }> {
+  const { Transaction } = await import("@bsv/sdk");
+  const results = await fetchTxHex(txid, net);
+  if (!results.length) return { confirmed: false, sources: [] };
+  if (new Set(results.map((r) => r.hex)).size > 1) return { confirmed: false, sources: [] }; // sources disagree — refuse
+  const confirmed = opReturnCarries(results[0].hex, root, Transaction);
+  return { confirmed, sources: results.map((r) => r.name) };
 }
 
 export type SpvResult = { status: "confirmed" | "rejected" | "inconclusive"; [k: string]: unknown };

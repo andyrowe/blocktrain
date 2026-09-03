@@ -77,7 +77,8 @@
   <pre>curl -O https://blocktrain.org/verify.mjs
 curl -O https://blocktrain.org/blocktrain-poc.json
 node verify.mjs blocktrain-poc.json</pre>
-  <p class="kv">It never contacts blocktrain or bsv.cx — only WhatsOnChain, GitHub, and your own CPU.
+  <p class="kv">It never contacts blocktrain or bsv.cx — only public BSV explorers (cross-checked, or
+  point it at your own node with <code>BLOCKTRAIN_EXPLORER</code>), GitHub, and your own CPU.
   Output ends with <span class="ok">✅ VERIFIED — batch existed, in order, anchored on-chain, refs corroborated.</span></p>
   <p class="kv">Rather read before you run? The verifier is a single dependency-free JavaScript file —
   <a href="https://github.com/andyrowe/blocktrain/blob/master/site/verify.mjs">read it on GitHub</a>.</p>
