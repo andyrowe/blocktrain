@@ -57,6 +57,26 @@ npm test    # RFC 6962 Merkle vectors + hash-chain tamper-detection
 
 Requires Node >= 24 (native TypeScript). Dependency-free: Node built-in crypto + fetch.
 
+## MCP server (use it from any agent framework)
+
+blocktrain is also an [MCP](https://modelcontextprotocol.io) server, so any MCP-capable agent
+(Claude Code, OpenClaw, …) can anchor and verify memory through tools — no per-framework glue.
+Tools: `blocktrain_append`, `blocktrain_seal`, `blocktrain_verify`, `blocktrain_reveal`,
+`blocktrain_status`, `blocktrain_keygen`. Wire it in:
+
+```jsonc
+{
+  "command": "node",
+  "args": ["/abs/path/blocktrain/bin/blocktrain-mcp.ts"],
+  "env": {
+    "BLOCKTRAIN_LOG": "/abs/path/data/log.jsonl",
+    "BLOCKTRAIN_PAY_WIF": "…only if you want the seal tool to spend"
+  }
+}
+```
+
+The CLI and the MCP server share one implementation (`src/core.ts`), so both behave identically.
+
 ## Design & privacy
 
 See [`DESIGN.md`](./DESIGN.md) for the full rationale: the fidelity ladder (asserted →

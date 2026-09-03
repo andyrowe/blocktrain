@@ -118,6 +118,12 @@ SignedMessage is recipient-verified and can't be. v1 = single-writer + counterpa
 checkpoints. Reuses chain/anchor/refs/encryption/context; new = manifest + checkpoints + sigs.
 **NOT built — gated on naming one real two-party use case first** (spec §7).
 
+## Phase 7.5 — MCP server ✅ DONE (2026-09-02)
+blocktrain exposed as an MCP server (`bin/blocktrain-mcp.ts`, stdio) so any framework (OpenClaw,
+Claude Code; Hermes via a bridge) uses one door: tools `blocktrain_append/seal/verify/reveal/
+status/keygen`. CLI + MCP share `src/core.ts` (single implementation, no drift). Proven via a
+real MCP client smoke test. This is the framework-agnostic integration layer under P8.
+
 ## Phase 8 — Hosted service + full landing
 When P4–P7 are proven, blocktrain.org moves to its own box: a blind-anchor API + branded
 verification pages. Own trust domain, own float, own keys. **Proof:** a client integrates

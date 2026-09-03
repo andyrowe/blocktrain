@@ -4,10 +4,11 @@
   "description": "Verifiable agent memory: a hash-chained, append-only event log anchored on-chain via bsv.cx (RFC 6962 batches), verifiable by anyone trusting no one.",
   "type": "module",
   "bin": {
-    "blocktrain": "bin/blocktrain.ts"
+    "blocktrain": "bin/blocktrain.ts",
+    "blocktrain-mcp": "bin/blocktrain-mcp.ts"
   },
   "scripts": {
-    "test": "node test/merkle.test.ts && node test/chain.test.ts && node test/hook.test.ts && node test/refs.test.ts && node test/pay.test.ts && node test/hooklock.test.ts && node test/refsguard.test.ts && node test/crypto.test.ts && node test/context.test.ts",
+    "test": "node test/merkle.test.ts && node test/chain.test.ts && node test/hook.test.ts && node test/refs.test.ts && node test/pay.test.ts && node test/hooklock.test.ts && node test/refsguard.test.ts && node test/crypto.test.ts && node test/context.test.ts && node test/mcp.smoke.ts",
     "cli": "node bin/blocktrain.ts"
   },
   "engines": {
@@ -16,6 +17,8 @@
   "license": "Apache-2.0",
   "private": true,
   "dependencies": {
-    "@bsv/sdk": "^2.4.2"
+    "@bsv/sdk": "^2.4.2",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.5.4"
   }
 }

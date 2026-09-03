@@ -36,71 +36,23 @@ async function main() {
   const cmd = process.argv[2];
   switch (cmd) {
     case "append": {
-      const actor = arg("--actor") ?? "mike";
       const kind = arg("--kind");
-      const dataRaw = arg("--data") ?? "{}";
       if (!kind) throw new Error("append: --kind is required");
       let data: unknown;
-      try {
-        data = JSON.parse(dataRaw);
-      } catch {
-        data = dataRaw; // allow a plain string payload
-      }
-      // P4: external refs (repeatable --ref) make the entry corroborated/falsifiable.
-      const { parseRefArg } = await import("../src/refs.ts");
-      const { randomBytes } = await import("node:crypto");
-      const refs = argsAll("--ref").map(parseRefArg);
-      const evidence = arg("--evidence") ?? (refs.length ? "corroborated" : "structured");
-      const baseObj = data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : { value: data };
-      const nonce = randomBytes(16).toString("hex");
-      const encTo = argsAll("--encrypt-to");
-      // P6: --context <file> / --context-data <string> commits the decision-time context as
-      // contextHash = sha256(nonce ‖ context), inside the entry (so it's anchored at action-time
-      // and can't be backfilled). The snapshot is stored in a sidecar (encrypted if --encrypt-to).
+      try { data = JSON.parse(arg("--data") ?? "{}"); } catch { data = arg("--data"); }
       const ctxFile = arg("--context");
       const ctxInline = arg("--context-data");
-      let ctxBlob: Buffer | null = null;
-      if (ctxFile) ctxBlob = readFileSync(ctxFile);
-      else if (ctxInline != null) ctxBlob = Buffer.from(ctxInline, "utf8");
-      let contextHash: string | undefined;
-      if (ctxBlob) {
-        const { computeContextHash } = await import("../src/chain.ts");
-        contextHash = computeContextHash(nonce, ctxBlob);
-      }
-      const enriched = {
-        ...baseObj,
-        evidence,
-        capturedBy: "self",
-        nonce,
-        ...(refs.length ? { refs } : {}),
-        ...(contextHash ? { contextHash } : {}),
-      };
-      const log = readLog(LOG);
-      const entry = appendEntry(log, { actor, kind, data: enriched });
-      // store the context snapshot in its sidecar (keyed by contextHash), encrypted if requested
-      if (ctxBlob && contextHash) {
-        const { writeContext } = await import("../src/store.ts");
-        if (encTo.length) {
-          const { encryptFor } = await import("../src/crypto.ts");
-          writeContext(LOG, contextHash, Buffer.from(JSON.stringify(encryptFor(ctxBlob, encTo)), "utf8"), true);
-        } else {
-          writeContext(LOG, contextHash, ctxBlob, false);
-        }
-      }
-      // P5: --encrypt-to <pub> (repeatable) stores the payload as an encrypted envelope
-      // instead of plaintext. The hashes still commit the plaintext, so the chain/anchor are
-      // unchanged and a key-holder can later prove the ciphertext matches (see `reveal`).
-      let stored: Record<string, unknown> = entry;
-      if (encTo.length) {
-        const { encryptFor } = await import("../src/crypto.ts");
-        const { canonicalize: canon } = await import("../src/canonical.ts");
-        const env = encryptFor(Buffer.from(canon(entry.data), "utf8"), encTo);
-        stored = { seq: entry.seq, ts: entry.ts, actor: entry.actor, kind: entry.kind, enc: env, entryHash: entry.entryHash, linkHash: entry.linkHash };
-      }
-      appendLog(LOG, stored as never);
-      console.log(`appended seq=${entry.seq} kind=${kind} evidence=${evidence}${refs.length ? ` refs=${refs.length}` : ""}${contextHash ? " +context" : ""}${encTo.length ? ` encrypted→${encTo.length} recipient(s)` : ""}`);
-      console.log(`  entryHash ${entry.entryHash}`);
-      console.log(`  linkHash  ${entry.linkHash}`);
+      const context = ctxFile ? readFileSync(ctxFile) : ctxInline != null ? ctxInline : undefined;
+      const { appendEvent } = await import("../src/core.ts");
+      const r = appendEvent({ log: LOG, seals: SEALS }, {
+        actor: arg("--actor"), kind, data,
+        refs: argsAll("--ref"), evidence: arg("--evidence"),
+        encryptTo: argsAll("--encrypt-to"), context,
+      });
+      const nRefs = argsAll("--ref").length;
+      console.log(`appended seq=${r.seq} kind=${kind} evidence=${r.evidence}${nRefs ? ` refs=${nRefs}` : ""}${r.contextHash ? " +context" : ""}${r.encryptedTo ? ` encrypted→${r.encryptedTo} recipient(s)` : ""}`);
+      console.log(`  entryHash ${r.entryHash}`);
+      console.log(`  linkHash  ${r.linkHash}`);
       break;
     }
 
@@ -118,104 +70,46 @@ async function main() {
       const leafBufs = leaves.map((h) => Buffer.from(h, "hex"));
       const localRoot = merkleRoot(leafBufs).toString("hex");
 
-      let seal: Seal;
       if (dry) {
-        seal = {
+        const seal: Seal = {
           root: localRoot, txid: "DRY", network: "dry", anchored: false,
           createdAt: new Date().toISOString(), fromSeq: from, toSeq: log.length - 1, leaves,
         };
         console.log(`[dry] would anchor ${leaves.length} entries (seq ${from}..${log.length - 1})`);
         console.log(`[dry] local merkle root ${localRoot}`);
-      } else {
-        const wif = process.env.BLOCKTRAIN_PAY_WIF;
-        if (!wif) throw new Error("seal: set BLOCKTRAIN_PAY_WIF to a funded mainnet WIF (bsv.cx /n/batch is x402 pay-gated)");
-        console.log(`anchoring ${leaves.length} entries (seq ${from}..${log.length - 1}) via bsv.cx (x402) ...`);
-        const receipt = await anchorBatch(leaves, wif);
-        if (receipt.settlementTxid) console.log(`paid x402 invoice, settlement tx ${receipt.settlementTxid}`);
-        // Compat gate: bsv.cx MUST derive the same root from the same leaves, or our
-        // client-side verifier and their tree disagree — refuse to record a bad seal.
-        if (receipt.root.toLowerCase() !== localRoot.toLowerCase()) {
-          throw new Error(
-            `root mismatch! local ${localRoot} vs bsv.cx ${receipt.root} — aborting, do not trust this anchor`,
-          );
-        }
-        seal = {
-          root: receipt.root, txid: receipt.txid, network: "main", anchored: receipt.anchored,
-          settlementTxid: receipt.settlementTxid,
-          createdAt: new Date().toISOString(), fromSeq: from, toSeq: log.length - 1, leaves,
-        };
-        console.log(`anchored txid ${receipt.txid} root ${receipt.root} (roots match ✓)`);
+        sf.seals.push(seal);
+        writeSeals(SEALS, sf);
+        break;
       }
-      sf.seals.push(seal);
-      writeSeals(SEALS, sf);
+      const wif = process.env.BLOCKTRAIN_PAY_WIF;
+      if (!wif) throw new Error("seal: set BLOCKTRAIN_PAY_WIF to a funded mainnet WIF (bsv.cx /n/batch is x402 pay-gated)");
+      console.log(`anchoring ${leaves.length} entries (seq ${from}..${log.length - 1}) via bsv.cx (x402) ...`);
+      const { sealPending } = await import("../src/core.ts");
+      const r = await sealPending({ log: LOG, seals: SEALS }, wif);
+      if (!r.sealed) { console.log(r.reason); break; }
+      if (r.settlementTxid) console.log(`paid x402 invoice, settlement tx ${r.settlementTxid}`);
+      console.log(`anchored ${r.count} entries txid ${r.txid} root ${r.root} (roots match ✓)`);
       break;
     }
 
     case "verify": {
-      const withSpv = has("--spv");
-      const log = readLog(LOG);
-      const chain = verifyChain(log);
-      if (!chain.ok) {
-        console.error(`CHAIN BROKEN at seq ${chain.failedSeq}: ${chain.reason}`);
+      const { verifyLog } = await import("../src/core.ts");
+      const r = await verifyLog({ log: LOG, seals: SEALS }, { refs: has("--refs"), onchain: has("--spv") });
+      if ("stage" in r) {
+        const fs = (r as { failedSeq?: number }).failedSeq;
+        console.error(`${(r.stage as string).toUpperCase()} verification failed${fs != null ? ` at seq ${fs}` : ""}: ${r.reason}`);
         process.exit(1);
       }
-      console.log(`chain ok: ${chain.count} entries, tip ${chain.tip ?? "(empty)"}${chain.encrypted ? ` (${chain.encrypted} encrypted — content needs a key; run reveal)` : ""}`);
-
-      const sf = readSeals(SEALS);
-      let anchorsOk = 0;
-      for (const s of sf.seals) {
-        // 1) each anchored leaf must match the logged linkHash at that seq
-        for (let i = 0; i < s.leaves.length; i++) {
-          const seq = s.fromSeq + i;
-          if (log[seq]?.linkHash !== s.leaves[i]) {
-            console.error(`seal ${s.root.slice(0, 12)}: leaf ${i} != log seq ${seq}`);
-            process.exit(1);
-          }
-        }
-        // 2) recompute the inclusion proof locally and fold it to the root (no server trust)
-        const bufs = s.leaves.map((h) => Buffer.from(h, "hex"));
-        for (let i = 0; i < bufs.length; i++) {
-          const proof = proofForIndex(bufs, i);
-          if (!verifyInclusion(bufs[i], proof, s.root)) {
-            console.error(`seal ${s.root.slice(0, 12)}: inclusion proof failed at leaf ${i}`);
-            process.exit(1);
-          }
-        }
-        // 3) optional: read the anchor tx off the public chain and confirm its OP_RETURN
-        //    encodes bsv.cx/not2/<root> — ground truth, trusting only the chain.
-        let spvNote = s.anchored ? "anchored" : "(unanchored)";
-        if (withSpv && s.txid && s.txid !== "DRY") {
-          try {
-            const onchain = await anchorCarriesRoot(s.txid, s.root, s.network === "test" ? "test" : "main");
-            spvNote = onchain ? "on-chain:root-confirmed ✓" : "on-chain:ROOT-NOT-FOUND ✗";
-            if (!onchain) process.exit(1);
-          } catch (e) {
-            spvNote = `on-chain:error(${(e as Error).message.slice(0, 50)})`;
-          }
-        }
-        console.log(`seal seq ${s.fromSeq}..${s.toSeq} root ${s.root.slice(0, 16)}… txid ${s.txid.slice(0, 12)}… ${spvNote}`);
-        anchorsOk++;
+      console.log(`chain ok: ${r.count} entries, tip ${r.tip ?? "(empty)"}${r.encrypted ? ` (${r.encrypted} encrypted — content needs a key; run reveal)` : ""}`);
+      for (const s of r.seals) {
+        const note = s.onchain ? `on-chain:${s.onchain}` : s.txid === "DRY" ? "(dry)" : "anchored";
+        console.log(`seal seq ${s.fromSeq}..${s.toSeq} root ${s.root.slice(0, 16)}… txid ${s.txid.slice(0, 12)}… ${note}`);
       }
-      // P4: corroborate external refs against the real world (WoC / GitHub / the open web).
-      if (has("--refs")) {
-        const { verifyRef } = await import("../src/refs.ts");
-        let checked = 0, okc = 0;
-        for (const e of log) {
-          const refs = (e.data as { refs?: unknown[] })?.refs;
-          if (!Array.isArray(refs)) continue;
-          for (const ref of refs) {
-            const r = await verifyRef(ref as never);
-            checked++;
-            if (r.ok) okc++;
-            console.log(`ref seq ${e.seq} ${(ref as { type: string }).type} ${r.ok ? "✓" : "✗"} ${r.detail}`);
-          }
-        }
-        console.log(`refs: ${okc}/${checked} corroborated against external sources`);
-        if (checked > 0 && okc < checked) process.exit(1);
-      }
-      const sealed = sealedThrough(sf.seals);
-      const unsealed = log.length - 1 - sealed;
-      console.log(`verified ${anchorsOk} seals; ${unsealed > 0 ? unsealed + " entries pending seal" : "all entries sealed"}`);
+      for (const rf of r.refs) console.log(`ref seq ${rf.seq} ${rf.type} ${rf.ok ? "✓" : "✗"} ${rf.detail}`);
+      if (r.refs.length) console.log(`refs: ${r.refs.filter((x) => x.ok).length}/${r.refs.length} corroborated`);
+      const unsealed = r.count - 1 - r.sealed;
+      console.log(`verified ${r.seals.length} seals; ${unsealed > 0 ? unsealed + " entries pending seal" : "all entries sealed"}`);
+      if (!r.ok) process.exit(1);
       break;
     }
 
@@ -247,29 +141,15 @@ async function main() {
     case "reveal": {
       const seq = Number(arg("--seq"));
       const wif = arg("--key");
-      if (!wif || Number.isNaN(seq)) throw new Error("reveal: --seq <n> --key <wif> required");
-      const log = readLog(LOG);
-      const e = log[seq] as { seq: number; ts: string; actor: string; kind: string; data?: unknown; enc?: unknown; entryHash: string };
-      if (!e) throw new Error(`no entry at seq ${seq}`);
-      if (!e.enc) {
-        console.log(`seq ${seq} is not encrypted; data: ${JSON.stringify(e.data)}`);
-        break;
+      if (Number.isNaN(seq)) throw new Error("reveal: --seq <n> required (--key <wif> if encrypted)");
+      const { revealEntry } = await import("../src/core.ts");
+      const rv = revealEntry({ log: LOG, seals: SEALS }, seq, wif);
+      console.log(`seq ${rv.seq} kind=${rv.kind}`);
+      console.log(`  data: ${JSON.stringify(rv.data)}`);
+      if (rv.encrypted) {
+        console.log(`  content integrity: ${rv.integrityOk ? "✓ matches the committed on-chain hash" : "✗ MISMATCH"}`);
+        if (!rv.integrityOk) process.exit(1);
       }
-      const { decryptWith } = await import("../src/crypto.ts");
-      const { computeEntryHash } = await import("../src/chain.ts");
-      let data: unknown;
-      try {
-        data = JSON.parse(decryptWith(e.enc as never, wif).toString("utf8"));
-      } catch (err) {
-        console.error(`cannot decrypt seq ${seq}: ${(err as Error).message}`);
-        process.exit(1);
-      }
-      const recomputed = computeEntryHash({ seq: e.seq, ts: e.ts, actor: e.actor, kind: e.kind, data });
-      const good = recomputed === e.entryHash;
-      console.log(`seq ${seq} kind=${e.kind}`);
-      console.log(`  decrypted: ${JSON.stringify(data)}`);
-      console.log(`  content integrity: ${good ? "✓ matches the committed on-chain hash" : "✗ MISMATCH"}`);
-      if (!good) process.exit(1);
       break;
     }
 
