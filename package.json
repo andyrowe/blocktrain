@@ -1,6 +1,6 @@
 {
   "name": "blocktrain",
-  "version": "0.1.0",
+  "version": "0.6.0",
   "description": "Verifiable agent memory: a hash-chained, append-only event log anchored on-chain via bsv.cx (RFC 6962 batches), verifiable by anyone trusting no one.",
   "type": "module",
   "bin": {

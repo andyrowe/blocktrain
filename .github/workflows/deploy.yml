@@ -18,6 +18,13 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+      - name: Stamp build version into the page
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          DATE=$(date -u +%Y-%m-%d)
+          LINK="<a href=\"https://github.com/andyrowe/blocktrain/commit/${GITHUB_SHA}\">${SHA}</a> · ${DATE}"
+          sed -i "s|__BUILD__|${LINK}|" site/index.html
+          echo "stamped build ${SHA} · ${DATE}"
       - name: Publish to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
