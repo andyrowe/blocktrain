@@ -4,5 +4,8 @@
   // service (not a Pages project), hence a Workers deploy rather than `pages deploy`.
   "name": "sparkling-shadow-3990",
   "compatibility_date": "2025-06-01",
+  // We serve via the blocktrain.org custom domain, not *.workers.dev — skip the subdomain
+  // step (it also needs an extra token scope we don't want to grant).
+  "workers_dev": false,
   "assets": { "directory": "./site" }
 }
