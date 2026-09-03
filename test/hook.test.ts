@@ -20,6 +20,17 @@ check("message send is captured, text not required", () => {
   assert.ok(!("message" in (c?.data ?? {})), "raw text must not be in data");
 });
 
+check("PII (phone targets, file paths) is redacted to a hash, never stored raw", () => {
+  const m = classify(ev("mcp__openclaw__message", { action: "send", channel: "whatsapp", target: "+15551234567", message: "hi" }));
+  assert.ok(!JSON.stringify(m?.data).includes("5551234567"), "phone number must not appear");
+  assert.ok((m?.data as { targetHash?: string }).targetHash, "target is hashed");
+  assert.ok(!("target" in (m?.data ?? {})), "raw target absent");
+  const f = classify(ev("Write", { file_path: "/home/mycroft/private/plan.md" }));
+  assert.ok(!JSON.stringify(f?.data).includes("private/plan"), "path must not appear");
+  assert.ok((f?.data as { pathHash?: string }).pathHash, "path is hashed");
+  assert.equal((f?.data as { ext?: string }).ext, ".md");
+});
+
 check("message read/react are skipped", () => {
   assert.equal(classify(ev("mcp__openclaw__message", { action: "read" })), null);
   assert.equal(classify(ev("mcp__openclaw__message", { action: "react" })), null);

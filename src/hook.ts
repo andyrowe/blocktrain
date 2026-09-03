@@ -21,6 +21,13 @@ function sha256hex(s: string): string {
   return createHash("sha256").update(s, "utf8").digest("hex");
 }
 
+// Redact a potentially-identifying value (message target/phone, agent target, file path) to a
+// short non-reversible digest, so the operational log never stores raw PII even locally. Lets
+// you correlate "same target" without revealing it; the full input is still committed in payloadHash.
+function redact(s: string): string | undefined {
+  return s ? sha256hex(s).slice(0, 16) : undefined;
+}
+
 export type ToolEvent = {
   tool_name?: string;
   tool_input?: Record<string, unknown>;
@@ -65,15 +72,15 @@ export function classify(ev: ToolEvent): Classified {
     return {
       kind: `message.${action}`,
       data: {
-        channel: str(input.channel) || undefined,
-        target: str(input.target) || str(input.channelId) || undefined,
+        channel: str(input.channel) || undefined, // provider name (e.g. "discord") — not PII
+        targetHash: redact(str(input.target) || str(input.channelId)), // recipient may be a phone number → hashed
         textLen: text.length || undefined,
       },
     };
   }
 
   // Cross-agent messaging / spawn
-  if (tool.endsWith("sessions_send")) return { kind: "agent.message", data: { to: str(input.sessionKey ?? input.agentId ?? input.label) || undefined } };
+  if (tool.endsWith("sessions_send")) return { kind: "agent.message", data: { toHash: redact(str(input.sessionKey ?? input.agentId ?? input.label)) } };
   if (tool.endsWith("sessions_spawn")) return { kind: "agent.spawn", data: { taskName: str(input.taskName) || undefined } };
 
   // Scheduling
@@ -93,7 +100,9 @@ export function classify(ev: ToolEvent): Classified {
     // Don't log writes to blocktrain's own store (avoid self-noise; the hook writes the
     // log via fs, not the Write tool, but a manual edit of it would otherwise show up).
     if (/blocktrain\/data\//.test(path)) return null;
-    return { kind: tool === "NotebookEdit" ? "notebook.edit" : `file.${tool === "Write" ? "write" : "edit"}`, data: { path: path || undefined } };
+    const dot = path.lastIndexOf(".");
+    const ext = dot > path.lastIndexOf("/") ? path.slice(dot) : undefined; // coarse hint, not identifying
+    return { kind: tool === "NotebookEdit" ? "notebook.edit" : `file.${tool === "Write" ? "write" : "edit"}`, data: { pathHash: redact(path), ext } };
   }
 
   // Shell — only the mutating/outward subset. Match against the command with quoted
