@@ -112,12 +112,16 @@ cd blocktrain && npm install && npm link   # puts `blocktrain` on your PATH
 # record what your agent did
 blocktrain append --actor my-agent --kind payment --data '{"to":"acme","sats":50000}'
 
+# corroborate an entry with an external ref anyone can check (txid / commit / url)
+blocktrain append --actor my-agent --kind deploy --data '{"service":"api"}' \
+  --ref git-commit:&lt;sha&gt;:you/repo
+
 # seal pending entries into one on-chain batch — needs a funded mainnet key
 # (pays a small bsv.cx fee): export BLOCKTRAIN_PAY_WIF=&lt;your-wif&gt;
 blocktrain seal
 
-# anyone can verify — trusting no one
-blocktrain verify --spv</pre>
+# anyone can verify — trusting no one (--refs also checks the external references)
+blocktrain verify --spv --refs</pre>
   <p class="kv">Prefer it automatic? Wire the PostToolUse hook and every outward action your agent
   takes is captured with no code changes —
   <a href="https://github.com/andyrowe/blocktrain#readme">see the repo</a>. SDK + hosted API on the roadmap.</p>
