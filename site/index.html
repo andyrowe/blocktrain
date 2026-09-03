@@ -127,9 +127,15 @@ blocktrain seal
 
 # anyone can verify — trusting no one (--refs also checks the external references)
 blocktrain verify --spv --refs</pre>
+  <p>Or use it as an <strong>MCP server</strong> — add it to any MCP client (Claude Code, OpenClaw, …)
+  and your agent gets the tools <code>blocktrain_append / seal / verify / reveal / status / keygen</code>,
+  no per-framework glue:</p>
+  <pre>{ "command": "node",
+  "args": ["/path/to/blocktrain/bin/blocktrain-mcp.ts"],
+  "env": { "BLOCKTRAIN_LOG": "…" } }</pre>
   <p class="kv">Prefer it automatic? Wire the PostToolUse hook and every outward action your agent
   takes is captured with no code changes —
-  <a href="https://github.com/andyrowe/blocktrain#readme">see the repo</a>. SDK + hosted API on the roadmap.</p>
+  <a href="https://github.com/andyrowe/blocktrain#readme">see the repo</a>. Hosted (remote MCP) service on the roadmap.</p>
 
   <h2>Honest scope</h2>
   <div class="panel scope">
