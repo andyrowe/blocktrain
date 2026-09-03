@@ -79,7 +79,7 @@ curl -O https://blocktrain.org/blocktrain-poc.json
 node verify.mjs blocktrain-poc.json</pre>
   <p class="kv">It never contacts blocktrain or bsv.cx — only WhatsOnChain, GitHub, and your own CPU.
   Output ends with <span class="ok">✅ VERIFIED — batch existed, in order, anchored on-chain, refs corroborated.</span></p>
-  <p class="kv">Rather read before you run? The verifier is ~130 lines of dependency-free JavaScript —
+  <p class="kv">Rather read before you run? The verifier is a single dependency-free JavaScript file —
   <a href="https://github.com/andyrowe/blocktrain/blob/master/site/verify.mjs">read it on GitHub</a>.</p>
 
   <h2>This PoC, on mainnet</h2>
@@ -87,6 +87,7 @@ node verify.mjs blocktrain-poc.json</pre>
     <div><b>Anchor tx</b> &nbsp;<a href="https://whatsonchain.com/tx/8863f5f50aa975676f63ee56bc0cd1d6a2827c957ddc5c685490dec30ea3b8d6">8863f5f50aa975676f63ee56bc0cd1d6a2827c957ddc5c685490dec30ea3b8d6</a></div>
     <div style="margin-top:6px"><b>Merkle root</b> &nbsp;908037282a89034a0af1bcf179462c449f07f51405a99d3b710b9f69777662be</div>
     <div style="margin-top:6px"><b>On-chain</b> &nbsp;OP_RETURN = <code>["bsv.cx","not2","908037…"]</code></div>
+    <div style="margin-top:6px"><b>Anchored</b> &nbsp;block 964,846 · 2026-09-01 12:54 UTC</div>
     <div style="margin-top:6px"><b>Entries</b> &nbsp;3 corroborated actions — anchor (BSV) · commit (GitHub) · site (live web)</div>
   </div>
 
@@ -103,14 +104,16 @@ node verify.mjs blocktrain-poc.json</pre>
   </ol>
 
   <h2>Use it on your agent</h2>
-  <p>Node ≥ 24. The content you log stays private — only hashes are anchored.</p>
+  <p>Node ≥ 24 (the CLI runs TypeScript natively). Only hashes go on-chain; your log stays on
+  your own machine — at-rest encryption is on the roadmap.</p>
   <pre>git clone https://github.com/andyrowe/blocktrain
-cd blocktrain && npm install
+cd blocktrain && npm install && npm link   # puts `blocktrain` on your PATH
 
 # record what your agent did
 blocktrain append --actor my-agent --kind payment --data '{"to":"acme","sats":50000}'
 
-# seal pending entries into one on-chain batch (small bsv.cx fee)
+# seal pending entries into one on-chain batch — needs a funded mainnet key
+# (pays a small bsv.cx fee): export BLOCKTRAIN_PAY_WIF=&lt;your-wif&gt;
 blocktrain seal
 
 # anyone can verify — trusting no one
@@ -133,6 +136,12 @@ blocktrain verify --spv</pre>
   default — blocktrain holds your proofs without being able to read them — and selective sharing with
   specific parties (a client, their counsel, a counterparty) without ever putting plaintext on-chain.
   Not built yet; described here so you know where this is going.</p>
+
+  <h2>Who it's for</h2>
+  <p>Agent builders, auditors, and teams whose agents act <em>on someone else's behalf</em> — anywhere
+  a second party needs to trust the record without trusting the operator. Building something like that,
+  or just curious? Open an issue or start a discussion on
+  <a href="https://github.com/andyrowe/blocktrain">GitHub</a> — we'd like to hear the use case.</p>
 
   <footer>
     Alpha · Apache-2.0 · <a href="https://github.com/andyrowe/blocktrain">source</a> · built on
