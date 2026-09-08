@@ -60,6 +60,26 @@ Everything below serves the second party.
 Not one model — a ladder, floored on non-custodial and topped with an explicit,
 labeled convenience.
 
+### Rung 0 — Sponsored float (donation-funded)  ✅ active, early phase
+
+During blocktrain's early phase, **sealing costs are covered by donations.** A modest
+project-funded wallet supplies the `BLOCKTRAIN_PAY_WIF`, so a newcomer can anchor for real
+without first acquiring BSV — the acquisition hurdle that stops most strangers at the door.
+
+- **Why it exists:** the first thing a stranger wants is to prove the *whole* loop —
+  append → seal → verify on-chain — before deciding blocktrain is worth funding themselves.
+  A sponsored float removes "go buy Bitcoin first" from step one.
+- **Donation address (BSV):** `1HuwPh5uDG1cuyCDUbWKjd5n7JLKHnhFXT` — top-ups keep the early
+  phase sealing. Verification never needs it (§0); this funds *anchoring* only.
+- **The honest limit, stated plainly:** a sponsored WIF that lives on the newcomer's box
+  spends the project's float directly. It is capped per-seal (§2, default 100k sats) and the
+  float is kept modest and refillable, so worst-case loss is bounded — but this is a
+  trust-and-goodwill arrangement for the early phase, **not** the trust-minimizing endgame.
+  A sponsor-signed payment endpoint (the WIF never leaving the sponsor's control) is the
+  later hardening; until then, treat the float as small, watched, and expendable.
+- **Not a paywall inversion:** the free/walletless *verify* path (§0) is untouched. This
+  only lowers the bar on the one operation that costs money.
+
 ### Rung 1 — Bring-your-own WIF  ✅ shipped
 
 The operator supplies `BLOCKTRAIN_PAY_WIF`, a funded mainnet key, via env. blocktrain reads
@@ -116,8 +136,11 @@ The [HOSTED-MCP.md](./HOSTED-MCP.md) design runs blocktrain as a remote MCP wher
 ## 6. Where this lands
 
 - Verification: **free and walletless, forever** (§0).
-- Anchoring: **non-custodial by default** — BYO-WIF now, BRC-100 wallet next — with
-  hosted-custodial as an **opt-in convenience, never the floor**.
+- Anchoring, early phase: **donation-sponsored float** (Rung 0) removes the acquisition
+  hurdle so a newcomer can prove the whole loop before funding themselves — donate at
+  `1HuwPh5uDG1cuyCDUbWKjd5n7JLKHnhFXT`.
+- Anchoring, self-funded: **non-custodial by default** — BYO-WIF now, BRC-100 wallet next —
+  with hosted-custodial as an **opt-in convenience, never the floor**.
 - Generating a per-user wallet is a non-answer (funding + custody); BRC-100 is the right
   interactive rail but serves a small population today.
 

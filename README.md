@@ -77,6 +77,22 @@ Tools: `blocktrain_append`, `blocktrain_seal`, `blocktrain_verify`, `blocktrain_
 
 The CLI and the MCP server share one implementation (`src/core.ts`), so both behave identically.
 
+## Sealing costs & donations
+
+**Verifying** an agent's log is free and needs no wallet, forever. Only **sealing**
+(anchoring a batch on-chain) spends BSV — ~300 sats per batch.
+
+During the early phase, **sealing costs are covered by donations**, so you can prove the
+full append → seal → verify loop without acquiring BSV first. Donations (BSV) top up the
+sealing float:
+
+```
+1HuwPh5uDG1cuyCDUbWKjd5n7JLKHnhFXT
+```
+
+See [`docs/PAYMENTS.md`](./docs/PAYMENTS.md) for the full payment model (sponsored float →
+bring-your-own WIF → BRC-100 wallet), and why verification never costs anything.
+
 ## Design & privacy
 
 See [`DESIGN.md`](./DESIGN.md) for the full rationale: the fidelity ladder (asserted →
