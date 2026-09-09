@@ -124,10 +124,17 @@ blocktrain context --seq 3        # show the context + prove it matches the comm
 
 # seal pending entries into one on-chain batch — needs a funded mainnet key
 # (pays a small bsv.cx fee): export BLOCKTRAIN_PAY_WIF=&lt;your-wif&gt;
+# the seal records who paid: funding wallet + anchor/fee/change breakdown
 blocktrain seal
 
-# anyone can verify — trusting no one (--refs also checks the external references)
+# anyone can verify — trusting no one (--refs checks external references;
+# --spv also reads the anchor + cross-checks the seal's funding receipt on-chain
+# and prints the funding wallet — derivation via a trusted lib, never hand-rolled)
 blocktrain verify --spv --refs</pre>
+  <p class="kv">Each seal is <strong>self-describing</strong>: it records the wallet that funded it
+  and the anchor / fee / change breakdown at seal time, so "which wallet paid, for which entries" is
+  read from a written record, not re-derived by hand. <code>verify --spv</code> cross-checks that
+  record against the settlement transaction and fails on a mismatch.</p>
   <p>Or use it as an <strong>MCP server</strong> — add it to any MCP client (Claude Code, OpenClaw, …)
   and your agent gets the tools <code>blocktrain_append / seal / verify / reveal / status / keygen</code>,
   no per-framework glue:</p>
@@ -169,7 +176,8 @@ blocktrain reveal --seq 3 --key &lt;wif&gt;       # authorized keys only</pre>
 
   <h2>Status</h2>
   <p><b>Shipped:</b> hash-chain · on-chain anchoring (bsv.cx) · corroboration (external refs) ·
-  encryption + blind, multi-party access · context anchoring · mechanical capture hook.<br>
+  encryption + blind, multi-party access · context anchoring · mechanical capture hook ·
+  self-describing seals (funding provenance, verified on-chain).<br>
   <b>Next:</b> shared verifiable room (spec'd) · hosted service.</p>
   <p class="kv"><a href="https://github.com/andyrowe/blocktrain/blob/master/ROADMAP.md">Full roadmap ↗</a></p>
 

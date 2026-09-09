@@ -13,6 +13,7 @@ Honest scope: blocktrain proves the integrity, order, and timestamp of a SELF-RE
 ## Use it
 - [Source + README (Apache-2.0)](https://github.com/andyrowe/blocktrain): CLI and MCP server.
 - CLI verbs: `append`, `seal`, `verify`, `reveal`, `keygen`, `context`, `status`.
+- Self-describing seals: each seal records its funding provenance at seal time (the wallet that paid, plus anchor/fee/change breakdown). `verify --spv` prints the funding wallet and cross-checks that record against the settlement tx on-chain, using a trusted library for any key/address derivation (never hand-rolled crypto). A receipt the chain contradicts fails verification.
 - MCP server (`bin/blocktrain-mcp.ts`, stdio): tools `blocktrain_append`, `blocktrain_seal`, `blocktrain_verify`, `blocktrain_reveal`, `blocktrain_status`, `blocktrain_keygen`. Add it to any MCP client (Claude Code, OpenClaw, …).
 
 ## Docs
