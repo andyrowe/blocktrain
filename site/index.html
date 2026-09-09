@@ -135,6 +135,9 @@ blocktrain verify --spv --refs</pre>
   and the anchor / fee / change breakdown at seal time, so "which wallet paid, for which entries" is
   read from a written record, not re-derived by hand. <code>verify --spv</code> cross-checks that
   record against the settlement transaction and fails on a mismatch.</p>
+  <p class="kv">No wallet yet? Early seals are <strong>sponsored</strong> — a donation float covers the
+  on-chain fee so you can try blocktrain end-to-end without funding a key. Top-ups keep that free tier
+  open: <a href="https://whatsonchain.com/address/1HuwPh5uDG1cuyCDUbWKjd5n7JLKHnhFXT">1HuwPh5uDG1cuyCDUbWKjd5n7JLKHnhFXT</a> (BSV).</p>
   <p>Or use it as an <strong>MCP server</strong> — add it to any MCP client (Claude Code, OpenClaw, …)
   and your agent gets the tools <code>blocktrain_append / seal / verify / reveal / status / keygen</code>,
   no per-framework glue:</p>

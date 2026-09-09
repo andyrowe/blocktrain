@@ -9,6 +9,7 @@ Honest scope: blocktrain proves the integrity, order, and timestamp of a SELF-RE
 ## Verify it yourself (trust no one)
 - [Standalone verifier](https://blocktrain.org/verify.mjs): a single zero-dependency Node script. Recomputes the hash-chain, folds each Merkle inclusion proof, reads the anchor tx's OP_RETURN straight off WhatsOnChain, and corroborates external refs. Contacts neither blocktrain nor bsv.cx.
 - [Public proof bundle](https://blocktrain.org/blocktrain-poc.json): a real batch anchored on mainnet. Run: `node verify.mjs blocktrain-poc.json` — expect `VERIFIED`.
+- Sponsored seals (Rung 0): the donation float `1HuwPh5uDG1cuyCDUbWKjd5n7JLKHnhFXT` covers early seal costs so you can try blocktrain walletless. Top-ups keep the free tier open; the PoC seal was funded from it.
 
 ## Use it
 - [Source + README (Apache-2.0)](https://github.com/andyrowe/blocktrain): CLI and MCP server.
