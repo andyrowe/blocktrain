@@ -51,9 +51,9 @@ export async function anchorBatch(
   hashes: string[],
   wif: string,
   base = DEFAULT_BASE,
-): Promise<BatchReceipt & { settlementTxid: string }> {
-  const { data, settlementTxid } = await postPaid<BatchReceipt>(`${base}/n/batch`, { hashes }, wif);
-  return { ...data, settlementTxid };
+): Promise<BatchReceipt & { settlementTxid: string; spend?: SpendReceipt }> {
+  const { data, settlementTxid, spend } = await postPaid<BatchReceipt>(`${base}/n/batch`, { hashes }, wif);
+  return { ...data, settlementTxid, spend };
 }
 
 // Pull bsv.cx's own inclusion proof for a hash. Free. We still verify it locally.
@@ -61,7 +61,7 @@ export function fetchProof(hash: string, base = DEFAULT_BASE): Promise<BsvcxProo
   return jsonFetch<BsvcxProof>(`${base}/n/${hash}/proof`);
 }
 
-import { postPaid } from "./pay.ts";
+import { postPaid, type SpendReceipt } from "./pay.ts";
 
 // Explorer-agnostic on-chain reads. We never trust a single explorer: by default we read the
 // tx from multiple independent sources and require them to AGREE on the bytes, so one down or
@@ -131,6 +131,55 @@ export async function anchorCarriesRoot(
   if (new Set(results.map((r) => r.hex)).size > 1) return { confirmed: false, sources: [] }; // sources disagree — refuse
   const confirmed = opReturnCarries(results[0].hex, root, Transaction);
   return { confirmed, sources: results.map((r) => r.name) };
+}
+
+// Cross-check a seal's written funding receipt against the settlement tx on-chain, using only
+// @bsv/sdk (never hand-rolled secp256k1). We rebuild the P2PKH locking scripts for the claimed
+// `payTo` and `funder` addresses and confirm the settlement tx actually contains an output paying
+// `anchorSats` to payTo and change back to funder. This turns "which wallet paid" into a checked
+// fact read from the artifact, not a hand-derivation. Returns which claims the chain confirms.
+// Pure predicate: does this set of tx outputs match the funding claim? Rebuilds the P2PKH
+// locking scripts for the claimed addresses via @bsv/sdk and compares — a malformed/invalid
+// claimed address can't lock a script, so it's treated as "no match", never a throw (a bad
+// receipt should fail verification cleanly, not blow up the whole verify run). No network, no
+// hand-rolled crypto; unit-testable in isolation.
+export async function receiptMatchesOutputs(
+  outputs: { scriptHex: string; satoshis: number }[],
+  claim: { funder: string; payTo: string; anchorSats: number },
+): Promise<{ paysAnchor: boolean; changeToFunder: boolean }> {
+  const { P2PKH } = await import("@bsv/sdk");
+  const lockHex = (addr: string): string | null => {
+    try {
+      return new P2PKH().lock(addr).toHex().toLowerCase();
+    } catch {
+      return null;
+    }
+  };
+  const payToScript = lockHex(claim.payTo);
+  const funderScript = lockHex(claim.funder);
+  let paysAnchor = false;
+  let changeToFunder = false;
+  for (const o of outputs) {
+    const script = o.scriptHex.toLowerCase();
+    if (payToScript && script === payToScript && o.satoshis === claim.anchorSats) paysAnchor = true;
+    if (funderScript && script === funderScript) changeToFunder = true;
+  }
+  return { paysAnchor, changeToFunder };
+}
+
+export async function settlementMatchesReceipt(
+  settlementTxid: string,
+  claim: { funder: string; payTo: string; anchorSats: number },
+  net: "main" | "test" = "main",
+): Promise<{ found: boolean; paysAnchor: boolean; changeToFunder: boolean; sources: string[] }> {
+  const { Transaction } = await import("@bsv/sdk");
+  const results = await fetchTxHex(settlementTxid, net);
+  if (!results.length) return { found: false, paysAnchor: false, changeToFunder: false, sources: [] };
+  if (new Set(results.map((r) => r.hex)).size > 1) return { found: false, paysAnchor: false, changeToFunder: false, sources: [] };
+  const tx = Transaction.fromHex(results[0].hex);
+  const outputs = tx.outputs.map((o) => ({ scriptHex: o.lockingScript.toHex(), satoshis: Number(o.satoshis) }));
+  const { paysAnchor, changeToFunder } = await receiptMatchesOutputs(outputs, claim);
+  return { found: true, paysAnchor, changeToFunder, sources: results.map((r) => r.name) };
 }
 
 export type SpvResult = { status: "confirmed" | "rejected" | "inconclusive"; [k: string]: unknown };

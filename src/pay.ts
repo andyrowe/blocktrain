@@ -55,7 +55,20 @@ export function resolvePayment(
   return { amount, net: netFromCaip2(network) };
 }
 
-export type PaidResult<T> = { data: T; settlementTxid: string };
+// What we actually spent, captured at pay time so a seal can describe itself without
+// anyone re-deriving it from the chain later. `funder` is the P2PKH address the WIF
+// controls (who paid); the breakdown is this settlement tx's outputs in sats.
+export type SpendReceipt = {
+  funder: string; // payer P2PKH address (public — never the WIF)
+  settlementTxid: string; // the x402 payment tx
+  anchorSats: number; // paid to the anchoring service (offer.payTo)
+  payTo: string; // the service address we paid the anchor sats to
+  feeSats: number; // miner fee on the settlement tx
+  changeSats: number; // change returned to `funder`
+  inputSats: number; // total sats sourced from `funder`'s UTXOs
+};
+
+export type PaidResult<T> = { data: T; settlementTxid: string; spend?: SpendReceipt };
 
 // POST `body` to `url`, paying the x402 invoice from `wif` if a 402 is returned.
 export async function postPaid<T>(url: string, body: unknown, wif: string): Promise<PaidResult<T>> {
@@ -64,7 +77,7 @@ export async function postPaid<T>(url: string, body: unknown, wif: string): Prom
   if (first.status !== 402) {
     const txt = await first.text();
     if (!first.ok) throw new Error(`bsv.cx POST ${url} -> ${first.status}: ${txt.slice(0, 300)}`);
-    return { data: JSON.parse(txt) as T, settlementTxid: "" }; // wasn't gated
+    return { data: JSON.parse(txt) as T, settlementTxid: "" }; // wasn't gated — no spend
   }
 
   const challengeHeader = first.headers.get("payment-required");
@@ -100,6 +113,11 @@ export async function postPaid<T>(url: string, body: unknown, wif: string): Prom
   await tx.fee(new SatoshisPerKilobyte(500));
   await tx.sign();
 
+  // Capture what this settlement actually spent, from the tx we just built — so the seal
+  // can carry its own funding provenance and nobody has to reverse-engineer it from chain.
+  const changeSats = tx.outputs.find((o) => o.change)?.satoshis ?? 0;
+  const feeSats = sourced - amount - changeSats;
+
   const payment = {
     x402Version: required.x402Version,
     resource: { url: required.resource.url },
@@ -125,7 +143,17 @@ export async function postPaid<T>(url: string, body: unknown, wif: string): Prom
       if (e instanceof Error && e.message.includes("settlement")) throw e;
     }
   }
-  return { data: JSON.parse(paidText) as T, settlementTxid };
+
+  const spend: SpendReceipt = {
+    funder: payerAddr,
+    settlementTxid,
+    anchorSats: amount,
+    payTo: offer.payTo,
+    feeSats,
+    changeSats,
+    inputSats: sourced,
+  };
+  return { data: JSON.parse(paidText) as T, settlementTxid, spend };
 }
 
 export { b64 };

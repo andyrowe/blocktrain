@@ -88,6 +88,7 @@ async function main() {
       const r = await sealPending({ log: LOG, seals: SEALS }, wif);
       if (!r.sealed) { console.log(r.reason); break; }
       if (r.settlementTxid) console.log(`paid x402 invoice, settlement tx ${r.settlementTxid}`);
+      if (r.funder) console.log(`funded by ${r.funder}`);
       console.log(`anchored ${r.count} entries txid ${r.txid} root ${r.root} (roots match ✓)`);
       break;
     }
@@ -103,7 +104,8 @@ async function main() {
       console.log(`chain ok: ${r.count} entries, tip ${r.tip ?? "(empty)"}${r.encrypted ? ` (${r.encrypted} encrypted — content needs a key; run reveal)` : ""}`);
       for (const s of r.seals) {
         const note = s.onchain ? `on-chain:${s.onchain}` : s.txid === "DRY" ? "(dry)" : "anchored";
-        console.log(`seal seq ${s.fromSeq}..${s.toSeq} root ${s.root.slice(0, 16)}… txid ${s.txid.slice(0, 12)}… ${note}`);
+        const fund = s.funder ? ` funded-by ${s.funder}${s.funding ? ` (${s.funding})` : ""}` : " funded-by (no receipt)";
+        console.log(`seal seq ${s.fromSeq}..${s.toSeq} root ${s.root.slice(0, 16)}… txid ${s.txid.slice(0, 12)}… ${note}${fund}`);
       }
       for (const rf of r.refs) console.log(`ref seq ${rf.seq} ${rf.type} ${rf.ok ? "✓" : "✗"} ${rf.detail}`);
       if (r.refs.length) console.log(`refs: ${r.refs.filter((x) => x.ok).length}/${r.refs.length} corroborated`);

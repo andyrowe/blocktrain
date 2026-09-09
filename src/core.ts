@@ -7,7 +7,7 @@ import { appendEntry, verifyChain, computeEntryHash, computeContextHash } from "
 import { readLog, appendLog, readSeals, writeSeals, sealedThrough, writeContext, type Seal } from "./store.ts";
 import { canonicalize } from "./canonical.ts";
 import { merkleRoot, proofForIndex, verifyInclusion } from "./merkle.ts";
-import { anchorBatch, anchorCarriesRoot } from "./client.ts";
+import { anchorBatch, anchorCarriesRoot, settlementMatchesReceipt } from "./client.ts";
 import { parseRefArg, verifyRef, type Ref } from "./refs.ts";
 import { encryptFor, decryptWith } from "./crypto.ts";
 
@@ -60,14 +60,22 @@ export async function sealPending(paths: Paths, wif: string) {
   if (receipt.root.toLowerCase() !== localRoot.toLowerCase()) {
     throw new Error(`root mismatch! local ${localRoot} vs bsv.cx ${receipt.root} — aborting`);
   }
+  // Capture funding provenance from the payment we just made, so the seal describes who paid
+  // (and from what) without anyone re-deriving it off-chain later. spend is absent only if the
+  // endpoint wasn't pay-gated (e.g. a local/test bsv.cx); then we simply record no receipt.
+  const sr = receipt.spend;
   const seal: Seal = {
     root: receipt.root, txid: receipt.txid, network: "main", anchored: receipt.anchored,
-    settlementTxid: receipt.settlementTxid, createdAt: new Date().toISOString(),
+    settlementTxid: receipt.settlementTxid,
+    receipt: sr
+      ? { funder: sr.funder, anchorSats: sr.anchorSats, payTo: sr.payTo, feeSats: sr.feeSats, changeSats: sr.changeSats, inputSats: sr.inputSats }
+      : undefined,
+    createdAt: new Date().toISOString(),
     fromSeq: from, toSeq: log.length - 1, leaves,
   };
   sf.seals.push(seal);
   writeSeals(paths.seals, sf);
-  return { sealed: true as const, txid: receipt.txid, root: receipt.root, settlementTxid: receipt.settlementTxid, count: leaves.length, fromSeq: from, toSeq: log.length - 1 };
+  return { sealed: true as const, txid: receipt.txid, root: receipt.root, settlementTxid: receipt.settlementTxid, funder: sr?.funder, count: leaves.length, fromSeq: from, toSeq: log.length - 1 };
 }
 
 export async function verifyLog(paths: Paths, opts: { refs?: boolean; onchain?: boolean } = {}) {
@@ -75,19 +83,39 @@ export async function verifyLog(paths: Paths, opts: { refs?: boolean; onchain?: 
   const chain = verifyChain(log);
   if (!chain.ok) return { ok: false as const, stage: "chain", failedSeq: chain.failedSeq, reason: chain.reason };
   const sf = readSeals(paths.seals);
-  const seals: { fromSeq: number; toSeq: number; root: string; txid: string; onchain?: string }[] = [];
+  const seals: { fromSeq: number; toSeq: number; root: string; txid: string; onchain?: string; funder?: string; funding?: string }[] = [];
   for (const s of sf.seals) {
     const bufs = s.leaves.map((h) => Buffer.from(h, "hex"));
     for (let i = 0; i < bufs.length; i++) {
       if (log[s.fromSeq + i]?.linkHash !== s.leaves[i]) return { ok: false as const, stage: "seal", reason: `leaf ${i} != log seq ${s.fromSeq + i}` };
       if (!verifyInclusion(bufs[i], proofForIndex(bufs, i), s.root)) return { ok: false as const, stage: "seal", reason: `inclusion proof failed at leaf ${i}` };
     }
+    const net = s.network === "test" ? "test" : "main";
     let onchain: string | undefined;
     if (opts.onchain && s.txid && s.txid !== "DRY") {
-      const c = await anchorCarriesRoot(s.txid, s.root, s.network === "test" ? "test" : "main");
+      const c = await anchorCarriesRoot(s.txid, s.root, net);
       onchain = c.confirmed ? `root-confirmed (${c.sources.join("+")})` : "ROOT-NOT-FOUND";
     }
-    seals.push({ fromSeq: s.fromSeq, toSeq: s.toSeq, root: s.root, txid: s.txid, onchain });
+    // Funding provenance, read from the seal's own receipt — never hand-derived. `funder` is the
+    // wallet that paid; `funding` reports whether the on-chain settlement tx matches that claim.
+    const funder = s.receipt?.funder;
+    let funding: string | undefined;
+    if (funder) {
+      funding = "receipt-only";
+      if (opts.onchain && s.settlementTxid) {
+        const m = await settlementMatchesReceipt(
+          s.settlementTxid,
+          { funder, payTo: s.receipt!.payTo, anchorSats: s.receipt!.anchorSats },
+          net,
+        );
+        funding = !m.found
+          ? "SETTLEMENT-NOT-FOUND"
+          : m.paysAnchor && m.changeToFunder
+            ? `confirmed (${m.sources.join("+")})`
+            : "RECEIPT-MISMATCH";
+      }
+    }
+    seals.push({ fromSeq: s.fromSeq, toSeq: s.toSeq, root: s.root, txid: s.txid, onchain, funder, funding });
   }
   const refs: { seq: number; type: string; ok: boolean; detail: string }[] = [];
   if (opts.refs) {
@@ -102,7 +130,10 @@ export async function verifyLog(paths: Paths, opts: { refs?: boolean; onchain?: 
   }
   const refsOk = refs.every((r) => r.ok);
   const onchainOk = seals.every((s) => s.onchain !== "ROOT-NOT-FOUND");
-  return { ok: refsOk && onchainOk, count: chain.count, encrypted: chain.encrypted, tip: chain.tip, sealed: sealedThrough(sf.seals), seals, refs };
+  // A written funding receipt that the chain contradicts is a hard failure; a receipt we didn't
+  // (or couldn't) check on-chain is not — absence of a check isn't evidence of a mismatch.
+  const fundingOk = seals.every((s) => s.funding !== "RECEIPT-MISMATCH" && s.funding !== "SETTLEMENT-NOT-FOUND");
+  return { ok: refsOk && onchainOk && fundingOk, count: chain.count, encrypted: chain.encrypted, tip: chain.tip, sealed: sealedThrough(sf.seals), seals, refs };
 }
 
 export function revealEntry(paths: Paths, seq: number, wif?: string) {

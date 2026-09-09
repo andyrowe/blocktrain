@@ -6,10 +6,24 @@ import { readFileSync, appendFileSync, writeFileSync, existsSync, mkdirSync } fr
 import { dirname } from "node:path";
 import type { LogEntry } from "./chain.ts";
 
+// Self-describing funding provenance, captured at seal time (see src/pay.ts SpendReceipt).
+// This is what lets `verify` answer "which wallet paid, from what, for which entries" from a
+// written artifact instead of anyone re-deriving it live off the chain. All addresses are
+// public P2PKH — never a WIF. Optional so old seals (pre-receipt) still load.
+export type SealReceipt = {
+  funder: string; // P2PKH address that paid (public)
+  anchorSats: number; // sats sent to the anchoring service
+  payTo: string; // service address the anchor sats went to
+  feeSats: number; // miner fee on the settlement tx
+  changeSats: number; // change returned to `funder`
+  inputSats: number; // total sats sourced from `funder`
+};
+
 export type Seal = {
   root: string; // merkle root of the sealed linkHashes (== bsv.cx not2 root)
   txid: string; // on-chain anchor txid
   settlementTxid?: string; // x402 payment tx we sent to bsv.cx (provenance of the spend)
+  receipt?: SealReceipt; // funding breakdown captured at seal time (who paid, from what)
   network: string; // "main" | "test"
   anchored: boolean;
   createdAt: string;

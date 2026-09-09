@@ -44,6 +44,48 @@ regardless of how many entries are in the batch — the pricing lesson from DESI
   network id — so a tampered or malicious 402 can't drain the payer.
 - **append / verify / reveal / status / keygen cost nothing.** Only `seal` spends.
 
+## 2.5. The seal is self-describing — funding is a written fact, not a re-derivation
+
+Every seal records **who paid and from what**, captured at seal time and stored beside the
+anchor (the `receipt` field on each seal in `data/seals.json`, type `SealReceipt` in
+`store.ts`). It carries the funding provenance so nobody has to reverse-engineer it off-chain:
+
+- `funder` — the public P2PKH address that paid (the address the pay-WIF controls; **never**
+  the WIF).
+- `payTo` / `anchorSats` — the anchoring-service address and the sats sent to it.
+- `feeSats` / `changeSats` / `inputSats` — the settlement tx's fee, change back to `funder`,
+  and total sats sourced.
+- Plus the existing `settlementTxid` — the x402 payment tx these outputs live in.
+
+**Why this exists:** before it, the only record of a seal was its Merkle root + anchor txid.
+Answering "which wallet funded this seal?" meant hand-pulling the settlement tx from an
+explorer and eyeballing outputs — error-prone, and exactly how a false alarm got manufactured
+once (a hand-rolled explorer script with a signature-math bug). The anchor was always correct;
+the *view* of it was weak. The receipt turns funding into an artifact you read, not math you
+redo live — the same "prove from a written record, don't re-derive" discipline the log applies
+to everything else.
+
+**`verify` reads and checks it.** `blocktrain_verify` prints each seal's `funder` from the
+receipt, and with `--onchain` cross-checks the receipt against the settlement tx using only
+`@bsv/sdk` (rebuilding the P2PKH locking scripts and confirming the tx pays `anchorSats` to
+`payTo` and returns change to `funder`). **No hand-rolled secp256k1 anywhere** — trusted
+library or a real node only. A receipt the chain contradicts (`RECEIPT-MISMATCH`) or a
+settlement that isn't on-chain (`SETTLEMENT-NOT-FOUND`) fails verification, same as a missing
+anchor root. A receipt we simply didn't check on-chain is reported (`receipt-only`), not
+failed — absence of a check is not evidence of a mismatch.
+
+**Which wallet funds which rung** (pin, so it's never guessed):
+
+- **Rung 0 (sponsored):** the donation float `1HuwPh5uDG1cuyCDUbWKjd5n7JLKHnhFXT` supplies the
+  WIF, so `funder` on those seals is that address (change returns to it). Spending the float
+  directly is the honest early-phase limit already stated in §4 Rung 0.
+- **Rung 1 (BYO-WIF):** `funder` is the operator's own key — non-custodial; the project never
+  sees it. Different operators/wallets across seals is expected and now *visible*: each seal
+  names its own funder rather than everyone assuming "the donation wallet."
+
+Receipts are optional on old (pre-receipt) seals so they still load and verify; only their
+`funder` is unknown, which is the honest state for a seal made before this record existed.
+
 ## 3. Who needs to pay — split the stranger in two
 
 A stranger arriving at blocktrain wants one of two things, with opposite payment needs:
